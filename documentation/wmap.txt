@@ -1,0 +1,150 @@
+=[ WMAP v1.0                                
+=[ Efrain Torres                                     
+   et[]metasploit.com
+---------------------------------------------------------------------------
+                        "Metasploit goes Web", H D Moore.
+
+
+=[ Intro.
+
+WMAP is a general purpose web application scanning framework for 
+Metasploit 3. The architecture is simple and its simplicity is what makes
+it powerful. It's a different approach compared to other open source 
+alternatives and commercial scanners, as WMAP is not build around any browser 
+or spider for data capture and manipulation. 
+
+
+=[ How it works.
+
+In the WMAP design, any tool can become a data gathering tool. In the 
+general case an attack proxy can be modified to store all the traffic between 
+the client(s) (i.e. favorite browser and/or spider). (See figure.) 
+
+Notice that a client may be used to store data too.
+
+
+[CLIENT] ----- [ATTACK PROXY] ----- [TARGET]
+    |                 |                 ^ 
+    ---------->[METASPLOIT DB]          |
+                      |                 |
+            [MSF 3 - WMAP SCANNER]      | 
+            [MSF 3 - WMAP MODULES] -----+
+
+WMAP is a Metasploit plugin and will interact with the database, reading all
+gathered traffic, processing it and launching the different tests 
+implemented as modules.  As tests are MSF Modules they can be easily 
+implemented, and can be run manually from the command line or automatically 
+via WMAP.
+
+As you may see this simple architecture allows you to have different 
+distributed clients and even different proxies all storing data to the 
+central repository. Remember everything is based on Metasploit, the test 
+modules are implemented as auxiliary modules and they can interact with any 
+other MSF component including the database, exploits and plugins.
+
+
+=[ WMAP Modules.
+ 	 
+The test modules implemented at this time are basic and will improve over 
+time not only in quality and quantity, so you are more than welcome to 
+submit new modules.
+
+Each module has a WMAP type, this determine when the module is launched and
+to a certain degree, the minimum type of information it requires to be 
+executed. The best way to develop a new test for WMAP, is to use already 
+implemented modules as a base and then develop a normal MSF module that can 
+be run manually from the command line. To enable a module to be run 
+automatically via WMAP  just include the mixin that determine the type 
+of the module. 
+
+	Example:
+
+	include Auxiliary::WMAPScanFile
+
+The following are the types of modules implemented at this time and they are
+listed in the order WMAP runs them:
+
+WMAPScanSSL         - Run once against SSL server
+WMAPScanServer      - Run once against the target Web Server
+WMAPScanDir         - Runs for every directory found in the target 
+WMAPScanFile        - Runs for every file found in the target
+WMAPScanUniqueQuery - Runs for every unique query found in each request to the 
+                      target 
+WMAPScanQuery       - Runs for every query found in each request to the target
+WMAPScanGeneric     - Modules to be run after all tests complete. Good place to
+                      perform passive analysis of responses, analysis of test
+                      results to launch other modules (i.e. exploits). 
+
+=[ Reporting.
+
+It uses the native reporting capabilities of MEtasploit.
+
+=[ Database
+
+No more sqlite. it uses whatever the framework is using.
+
+=[ Simple example.
+
+The following are the basic steps for testing a web server/app using WMAP: 
+
+  1. Crawl a web site using the /auxiliary/scanner/http/crawler module
+  2. Load the wmap plugin
+  3. View available sites to test:
+	
+	wmap_sites -l
+
+  4. View site structure
+
+	wmap_sites -s <vhost,url>
+	
+	Example: wmap_sites -s www.testsite.org,http://192.168.1.1
+
+  5. Define targets from available sites
+
+	wmap_targets -t <vhost,url>
+
+  6. Test it.
+
+	wmap_run -e
+
+=[ Additional Stuff
+
+  Before runing the test you may need to set certain variables 
+  required by some modules.
+
+  Example:	 
+
+      msf > setg DOMAIN targetco.com
+      DOMAIN => targetco.com
+
+      msf > setg EXT .asp
+      EXT => .asp
+
+      msf > setg WMAP_EXCLUDE_FILE <regex_to_exclude_testing_files>
+
+            NOTE: By default image files are not included in the tests.	
+
+      If required profiles can be defined in the following way:
+
+            wmap_run -e path/to/profile/file
+
+            The profile file contains the list of modules to execute.
+            See data/wmap/wmap_sample.profile for a sample.		
+
+=[ TODO. 
+  
+
+This is first real release version of WMAP and as you know, the Metasploit project
+welcomes feedback, comments, ideas, patches, modules, etc. 
+
+
+=[ EOF.		                     
+
+
+
+
+
+
+
+
+
