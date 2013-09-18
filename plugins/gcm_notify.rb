@@ -3,51 +3,40 @@
 # $Revision$
 #
 
+
 module Msf
 
 ###
 #
-# This class hooks all session creation events and allows automated interaction
-# This is only an example of what you can do with plugins
+# This class hooks all session creation and sends a gcm notification with session id
 #
 ###
 
-class Plugin::SessionTagger < Msf::Plugin
+class Plugin::GCMNotify < Msf::Plugin
 
 	include Msf::SessionEvent
 
-	attr_accessor :reg_ids
+	attr_accessor :gcm
+	attr_accessor :reg_id
 
 	def on_session_open(session)
-		print_status("Hooked session #{session.sid} / #{session.session_host}")
-
-		options = {data: {host: "#{session.session_host}", session: "#{session.sid}"}, collapse_key: "updated_score"}
-		response = gcm.send_notification(@reg_ids, options)
-
-		#session.shell_write("MKDIR C:\\TaggedBy#{ENV['USER']}\n")
-
-		# Read output with session.shell_read()
-	end
-
-	def on_session_close(session,reason='')
-		print_status("Hooked session #{session.sid} is shutting down")
+		options = {data: {host: "#{session.session_host}", session: "#{session.sid}"}}
+		response = @gcm.send_notification([reg_id], options)
 	end
 
 	def initialize(framework, opts)
 		super
 
-
 		begin
-			require 'gcm'
+			require "gcm"
 		rescue LoadError
 			raise "WARNING: GCM gem not found, Please 'gem install gcm'"
 		end
 
-		api_key = opts['apikey']
-		registration_id = opts['id']
-		@reg_ids = [registration_id] # an array of one or more client registration IDs
+		api_key = opts[:api_key] || opts['api_key']
+		@reg_id = opts[:reg_id] || opts['reg_id']
 
-		gcm = GCM.new(api_key)
+		self.gcm = GCM.new(api_key)
 		self.framework.events.add_session_subscriber(self)
 	end
 
