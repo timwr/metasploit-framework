@@ -79,7 +79,8 @@ class Railgun
     'wlanapi',
     'wldap32',
     'version',
-    'psapi'
+    'psapi',
+    'winmm'
   ].freeze
 
   ##
