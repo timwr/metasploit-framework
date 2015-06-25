@@ -64,7 +64,7 @@ end
 launcheractivity = findlauncheractivity(amanifest)
 smalifile = 'original/smali/' + launcheractivity.gsub(/\./, "/") + '.smali'
 begin
-activitysmali = File.read(smalifile)
+	activitysmali = File.read(smalifile)
 rescue Errno::ENOENT
     #If XML parsing doesn't work to find the launcher activity,
     #do a string search on the decompiled smali files for the
