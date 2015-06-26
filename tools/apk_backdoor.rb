@@ -65,13 +65,10 @@ def findlauncheractivity(amanifest)
     end
 end
 
-
-launcheractivity = findlauncheractivity(amanifest)
-smalifile = 'original/smali/' + launcheractivity.gsub(/\./, "/") + '.smali'
-begin
-	activitysmali = File.read(smalifile)
-rescue Errno::ENOENT
-	print "[!] Unable to find correct hook automatically\n"
+# If XML parsing of the manifest fails, recursively search
+# the smali code for the onCreate() hook and let the user
+# pick the injection point
+def scrapeFilesForLauncherActivity()
 	smali_files||=[]
 	Dir.glob('original/smali*/**/*.smali') do |file|
 	  checkFile=File.read(file)
@@ -93,6 +90,8 @@ rescue Errno::ENOENT
 		hook = STDIN.gets.chomp.to_i
 	end
 	i=0
+	smalifile=""
+	activitysmali=""
 	smali_files.each{|s_file|
 		if (i==hook)
 			checkFile=File.read(s_file)
@@ -102,7 +101,23 @@ rescue Errno::ENOENT
 		end
 		i+=1
 	}
-	
+	return [smalifile,activitysmali]
+end
+
+launcheractivity = findlauncheractivity(amanifest)
+smalifile = 'original/smali/' + launcheractivity.gsub(/\./, "/") + '.smali'
+begin
+	activitysmali = File.read(smalifile)
+rescue Errno::ENOENT
+	print "[!] Unable to find correct hook automatically\n"
+	begin
+		results=scrapeFilesForLauncherActivity()
+		smalifile=results[0]
+		activitysmali=results[1]
+	rescue
+		puts "[-] Error finding launcher activity. Exiting"
+		exit(1)
+	end
 end
 print "[*] Copying payload files..\n"
 FileUtils.mkdir_p('original/smali/com/metasploit/stage/')
