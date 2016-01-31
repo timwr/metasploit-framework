@@ -25,10 +25,11 @@ Gem::Specification.new do |spec|
   spec.license       = 'BSD-3-clause'
 
   spec.files         = `git ls-files`.split($/).reject { |file|
-    file =~ /^config/
+    file =~ /^documentation|^data\/gui|^external/
   }
   spec.bindir = '.'
-  spec.executables   = [
+  if ENV['CREATE_BINSTUBS']
+    spec.executables   = [
       'msfbinscan',
       'msfconsole',
       'msfd',
@@ -40,7 +41,8 @@ Gem::Specification.new do |spec|
       'msfrpcd',
       'msfupdate',
       'msfvenom'
-  ]
+    ]
+  end
   spec.test_files    = spec.files.grep(%r{^spec/})
   spec.require_paths = ["lib"]
 
@@ -63,12 +65,12 @@ Gem::Specification.new do |spec|
   # Metasploit::Credential database models
   spec.add_runtime_dependency 'metasploit-credential', '1.0.1'
   # Database models shared between framework and Pro.
-  spec.add_runtime_dependency 'metasploit_data_models', '1.2.9'
+  spec.add_runtime_dependency 'metasploit_data_models', '1.2.10'
   # Things that would normally be part of the database model, but which
   # are needed when there's no database
   spec.add_runtime_dependency 'metasploit-model', '1.0.0'
   # Needed for Meterpreter
-  spec.add_runtime_dependency 'metasploit-payloads', '1.0.19'
+  spec.add_runtime_dependency 'metasploit-payloads', '1.0.22'
   # Needed by msfgui and other rpc components
   spec.add_runtime_dependency 'msgpack'
   # get list of network interfaces, like eth* from OS.
