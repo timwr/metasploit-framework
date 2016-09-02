@@ -65,68 +65,68 @@ class Console::CommandDispatcher::Android
   end
 
   def cmd_interval_collect(*args)
-      @@interval_collect_opts ||= Rex::Parser::Arguments.new(
-        '-h' => [false, 'Help Banner'],
-        '-a' => [true, "Action (required, one of: #{client.android.collect_actions.join(', ')})"],
-        '-c' => [true, "Collector type (required, one of: #{client.android.collect_types.join(', ')})"],
-        '-t' => [true, 'Collect poll timeout period in seconds (default: 30)']
+    @@interval_collect_opts ||= Rex::Parser::Arguments.new(
+      '-h' => [false, 'Help Banner'],
+      '-a' => [true, "Action (required, one of: #{client.android.collect_actions.join(', ')})"],
+      '-c' => [true, "Collector type (required, one of: #{client.android.collect_types.join(', ')})"],
+      '-t' => [true, 'Collect poll timeout period in seconds (default: 30)']
+    )
+
+    opts = {
+      action:  nil,
+      type:    nil,
+      timeout: 30
+    }
+
+    @@interval_collect_opts.parse(args) do |opt, idx, val|
+      case opt
+      when '-a'
+        opts[:action] = val.downcase
+      when '-c'
+        opts[:type] = val.downcase
+      when '-t'
+        opts[:timeout] = val.to_i
+        opts[:timeout] = 30 if opts[:timeout] <= 0
+      end
+    end
+
+    unless client.android.collect_actions.include?(opts[:action])
+      interval_collect_usage
+      return
+    end
+
+    type = args.shift.downcase
+
+    unless client.android.collect_types.include?(opts[:type])
+      interval_collect_usage
+      return
+    end
+
+    result = client.android.interval_collect(opts)
+    if result[:headers].length > 0 && result[:entries].length > 0
+      header = "Captured #{opts[:type]} data"
+
+      if result[:timestamp]
+        time = Time.at(result[:timestamp]).to_datetime
+        header << " at #{time.strftime('%Y-%m-%d %H:%M:%S')}"
+      end
+
+      table = Rex::Text::Table.new(
+        'Header'    => header,
+        'SortIndex' => 0,
+        'Columns'   => result[:headers],
+        'Indent'    => 0
       )
 
-      opts = {
-        action:  nil,
-        type:    nil,
-        timeout: 30
-      }
-
-      @@interval_collect_opts.parse(args) do |opt, idx, val|
-        case opt
-        when '-a'
-          opts[:action] = val.downcase
-        when '-c'
-          opts[:type] = val.downcase
-        when '-t'
-          opts[:timeout] = val.to_i
-          opts[:timeout] = 30 if opts[:timeout] <= 0
-        end
+      result[:entries].each do |e|
+        table << e
       end
 
-      unless client.android.collect_actions.include?(opts[:action])
-        interval_collect_usage
-        return
-      end
-
-      type = args.shift.downcase
-
-      unless client.android.collect_types.include?(opts[:type])
-        interval_collect_usage
-        return
-      end
-
-      result = client.android.interval_collect(opts)
-      if result[:headers].length > 0 && result[:entries].length > 0
-        header = "Captured #{opts[:type]} data"
-
-        if result[:timestamp]
-          time = Time.at(result[:timestamp]).to_datetime
-          header << " at #{time.strftime('%Y-%m-%d %H:%M:%S')}"
-        end
-
-        table = Rex::Text::Table.new(
-          'Header'    => header,
-          'SortIndex' => 0,
-          'Columns'   => result[:headers],
-          'Indent'    => 0
-        )
-
-        result[:entries].each do |e|
-          table << e
-        end
-
-        print_line
-        print_line(table.to_s)
-      else
-        print_good('Interval action completed successfully')
-      end
+      print_line
+      print_line(table.to_s)
+    else
+      print_good('Interval action completed successfully')
+    end
   end
 
   def cmd_device_shutdown(*args)
@@ -380,10 +380,8 @@ class Console::CommandDispatcher::Android
   def cmd_dump_calllog(*args)
     path = "calllog_dump_#{Time.new.strftime('%Y%m%d%H%M%S')}.txt"
     dump_calllog_opts = Rex::Parser::Arguments.new(
-
       '-h' => [ false, 'Help Banner' ],
       '-o' => [ true, 'Output path for call log']
-
     )
 
     dump_calllog_opts.parse(args) do |opt, _idx, val|
@@ -440,7 +438,6 @@ class Console::CommandDispatcher::Android
   end
 
   def cmd_check_root(*args)
-
     check_root_opts = Rex::Parser::Arguments.new(
       '-h' => [ false, 'Help Banner' ]
     )
