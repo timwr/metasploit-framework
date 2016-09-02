@@ -343,11 +343,10 @@ class Console::CommandDispatcher::Android
   end
 
   def cmd_geolocate(*args)
-
-    generate_map = false
+    view_map = false
     geolocate_opts = Rex::Parser::Arguments.new(
       '-h' => [ false, 'Help Banner' ],
-      '-g' => [ false, 'Generate map using google-maps']
+      '-v' => [ false, 'Automatically view the map in google-maps']
     )
 
     geolocate_opts.parse(args) do |opt, _idx, _val|
@@ -357,8 +356,8 @@ class Console::CommandDispatcher::Android
         print_line('Get current location using geolocation.')
         print_line(geolocate_opts.usage)
         return
-      when '-g'
-        generate_map = true
+      when '-v'
+        view_map = true
       end
     end
 
@@ -367,12 +366,12 @@ class Console::CommandDispatcher::Android
     print_status('Current Location:')
     print_line("\tLatitude:  #{geo[0]['lat']}")
     print_line("\tLongitude: #{geo[0]['long']}\n")
-    print_line("To get the address: https://maps.googleapis.com/maps/api/geocode/json?latlng=#{geo[0]['lat'].to_f},#{geo[0]['long'].to_f}&sensor=true\n")
 
-    if generate_map
-      link = "https://maps.google.com/maps?q=#{geo[0]['lat'].to_f},#{geo[0]['long'].to_f}"
-      print_status("Generated map on google-maps:")
-      print_status(link)
+    maps_string = "#{geo[0]['lat'].to_f},#{geo[0]['long'].to_f}"
+    link = "https://maps.google.com/maps?q=#{maps_string}"
+    print_status("Google Maps URL:  #{link}")
+    print_status("Google Maps Address: https://maps.googleapis.com/maps/api/geocode/json?latlng=#{maps_string}")
+    if view_map
       Rex::Compat.open_browser(link)
     end
 
