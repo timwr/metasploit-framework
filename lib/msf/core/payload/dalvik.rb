@@ -47,9 +47,9 @@ module Msf::Payload::Dalvik
 
   def generate_cert
     x509_name = OpenSSL::X509::Name.parse(
-      "C=Unknown/ST=Unknown/L=Unknown/O=Unknown/OU=Unknown/CN=Unknown"
+      "C=US/O=Android/CN=Android Debug"
       )
-    key  = OpenSSL::PKey::RSA.new(1024)
+    key  = OpenSSL::PKey::RSA.new(2048)
     cert = OpenSSL::X509::Certificate.new
     cert.version = 2
     cert.serial = 1
@@ -72,7 +72,7 @@ module Msf::Payload::Dalvik
     cert.not_after = cert.not_before + 3600*24*365*20 # 20 years
 
     # If this line is left out, signature verification fails on OSX.
-    cert.sign(key, OpenSSL::Digest::SHA1.new)
+    cert.sign(key, OpenSSL::Digest::SHA256.new)
 
     return cert, key
   end
