@@ -103,6 +103,7 @@ class Console::CommandDispatcher::Stdapi::Sys
       "sysinfo"     => "Gets information about the remote system, such as OS",
       "localtime"   => "Displays the target system's local date and time",
       "dcow"        => "Attempts to perform a dirty copy on write",
+      "dcow_memory" => "Attempts to perform a dirty copy on write",
     }
     reqs = {
       "clearev"     => [ "stdapi_sys_eventlog_open", "stdapi_sys_eventlog_clear" ],
@@ -139,6 +140,7 @@ class Console::CommandDispatcher::Stdapi::Sys
       "sysinfo"     => [ "stdapi_sys_config_sysinfo" ],
       "localtime"   => [ "stdapi_sys_config_localtime" ],
       "dcow"        => [ "stdapi_sys_config_dcow" ],
+      "dcow_memory"        => [ "stdapi_sys_config_dcow_memory" ],
     }
 
     all.delete_if do |cmd, desc|
@@ -837,11 +839,24 @@ class Console::CommandDispatcher::Stdapi::Sys
   #
   def cmd_dcow(*args)
     if (args.length < 2)
-      print_line("Usage: dcow fromfile newfile")
+      print_line("Usage: dcow remote_file file_to_overwrite")
       return true
     end
 
     print_line("dcow: " + client.sys.config.dcow(args[0],args[1]))
+    return true
+  end
+
+  #
+  # Move source to destination
+  #
+  def cmd_dcow_memory(*args)
+    if (args.length < 2)
+      print_line("Usage: dcow localfile file_to_overwrite")
+      return true
+    end
+    buf = ::File.read(args[0])
+    print_line("dcow_memory: " + client.sys.config.dcow_memory(args[1],buf))
     return true
   end
 

@@ -111,13 +111,24 @@ class Config
   end
 
   #
-  # Returns the target's local system date and time.
+  # 
   #
-  def dcow(library_path, target_path)
+  def dcow(file_path, target_path)
     request = Packet.create_request('stdapi_sys_config_dcow')
-    request.add_tlv(TLV_TYPE_LIBRARY_PATH, library_path)
+    request.add_tlv(TLV_TYPE_FILE_PATH, file_path)
     request.add_tlv(TLV_TYPE_TARGET_PATH, target_path)
+    response = client.send_request(request)
+    (response.get_tlv_value(TLV_TYPE_LOCAL_DATETIME) || "").strip
+  end
 
+  #
+  # 
+  #
+  def dcow_memory(target_path, buf)
+    request = Packet.create_request('stdapi_sys_config_dcow_memory')
+    request.add_tlv(TLV_TYPE_DATA, buf)
+    request.add_tlv(TLV_TYPE_LENGTH, buf.length)
+    request.add_tlv(TLV_TYPE_TARGET_PATH, target_path)
     response = client.send_request(request)
     (response.get_tlv_value(TLV_TYPE_LOCAL_DATETIME) || "").strip
   end
