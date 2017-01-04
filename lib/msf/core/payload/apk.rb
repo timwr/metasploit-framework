@@ -230,7 +230,7 @@ class Msf::Payload::Apk
     end
 
     # Append smali to one of the these entrypoints
-    entrypoints = [ ';->onCreate(Landroid/os/Bundle;)V', ';->onCreate()V', ';->onResume()V' ]
+    entrypoints = [ ';->onCreate(Landroid/os/Bundle;)V', ';->onCreate()V', ';->onResume()V', ';->getBaseContext()Landroid/content/Context;' ]
     for checkentrypoint in entrypoints
       if hooksmali.include? checkentrypoint
         entrypoint = checkentrypoint
