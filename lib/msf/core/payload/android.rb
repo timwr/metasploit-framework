@@ -9,6 +9,13 @@ module Msf::Payload::Android
   include Msf::Payload::TransportConfig
   include Msf::Payload::UUID::Options
 
+  def initialize(info = {})
+    ret = super( info )
+    register_advanced_options([
+      OptBool.new('AndroidMeterpreterDebug', [ true, 'Enable debugging for the Android meterpreter', false ])
+    ], self.class)
+    ret
+  end
   #
   # Fix the dex header checksum and signature
   # http://source.android.com/tech/dalvik/dex-format.html
@@ -56,6 +63,7 @@ module Msf::Payload::Android
 
     config = Rex::Payloads::Meterpreter::Config.new(config_opts).to_b
     config[0] = "\x01" if opts[:stageless]
+    config[1] = "\x01" if ds['AndroidMeterpreterDebug']
     config
   end
 
