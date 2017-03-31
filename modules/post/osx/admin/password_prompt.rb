@@ -18,10 +18,11 @@ class MetasploitModule < Msf::Post
       },
       'References'    =>
         [
-          ['URL', 'http://www.gabrielserafini.com/blog/2008/08/19/mac-os-x-voices-for-using-with-the-say-command/']
+          ['URL', 'https://fuzzynop.blogspot.hk/2014/10/osascript-for-local-phishing.html']
+          ['URL', 'https://github.com/fuzzynop/FiveOnceInYourLife']
         ],
       'License'       => MSF_LICENSE,
-      'Author'        => [ 'timwr'],
+      'Author'        => [ 'fuzzynop', 'timwr'],
       'Platform'      => [ 'osx' ],
       'SessionTypes'  => [ "meterpreter", "shell" ]
     ))
