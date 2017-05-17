@@ -884,12 +884,12 @@ require 'msf/core/exe/segment_appender'
 </plist>
     |
 
-    zip = Rex::Zip::Archive.new
-    zip.add_file("#{app_name}/", '')
-    zip.add_file("#{app_name}/Contents/", '')
-    zip.add_file("#{app_name}/Contents/MacOS/", '')
-    zip.add_file("#{app_name}/Contents/Resources/", '')
-    zip.add_file("#{app_name}/Contents/MacOS/#{exe_name}", exe)
+    zip = Rex::Zip::Archive.new(Rex::Zip::CM_DEFLATE, Rex::Zip::ZIP_VERSION_UNIX)
+    zip.add_file("#{app_name}/", '', nil, nil, nil, Rex::Zip::EFA_UNIX_RWX)
+    zip.add_file("#{app_name}/Contents/", '', nil, nil, nil, Rex::Zip::EFA_UNIX_RWX)
+    zip.add_file("#{app_name}/Contents/Resources/", '', nil, nil, nil, Rex::Zip::EFA_UNIX_RWX)
+    zip.add_file("#{app_name}/Contents/MacOS/", '', nil, nil, nil, Rex::Zip::EFA_UNIX_RWX)
+    zip.add_file("#{app_name}/Contents/MacOS/#{exe_name}", exe, nil, nil, nil, Rex::Zip::EFA_UNIX_RWX)
     zip.add_file("#{app_name}/Contents/Info.plist", info_plist)
     zip.add_file("#{app_name}/Contents/PkgInfo", 'APPLaplt')
     zip.pack
