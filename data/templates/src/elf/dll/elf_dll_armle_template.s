@@ -48,7 +48,7 @@ shdr:
   dd    dynsection                 ; sh_addr
   dd    dynsection                 ; sh_offset
   dd    dynsz                      ; sh_size
-  dd    0                          ; sh_link
+  dd    1                          ; sh_link
   dd    0                          ; sh_info
   dd    8                          ; sh_addralign
   dd    7                          ; sh_entsize
@@ -67,6 +67,9 @@ dynsection:
 ; DT_INIT
   dd    0x0c
   dd    _start
+; DT_HASH
+  dd    0x04
+  dd    0
 ; DT_STRTAB
   dd    0x05
   dd    strtab
@@ -75,9 +78,6 @@ dynsection:
   dd    strtab
 ; DT_STRSZ
   dd    0x0a
-  dd    0
-; DT_SYMENT
-  dd    0x0b
   dd    0
 ; DT_NULL
   dd    0x00
