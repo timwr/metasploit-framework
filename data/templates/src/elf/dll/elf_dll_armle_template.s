@@ -33,12 +33,12 @@ phdr:
 
 phdrsize equ  $ - phdr
   dd    2                          ; p_type  = PT_DYNAMIC
-  dd    7                          ; p_flags = rwx
   dd    dynsection                 ; p_offset
   dd    dynsection                 ; p_vaddr
   dd    dynsection                 ; p_vaddr
   dd    dynsz                      ; p_filesz
   dd    dynsz                      ; p_memsz
+  dd    7                          ; p_flags = rwx
   dd    0x1000                     ; p_align
 
 shdr:
