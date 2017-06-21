@@ -1,0 +1,11 @@
+
+apt update
+apt upgrade
+apt install git ruby ruby-dev make clang autoconf curl wget ncurses-utils libsqlite-dev postgresql postgresql-dev libpcap-dev libffi-dev
+#libxslt-dev pkg-config
+git clone https://github.com/timwr/metasploit-framework.git
+cd metasploit-framework
+git checkout termux
+gem install bundler
+bundle install --gemfile Gemfile.local
+
