@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/data/data/com.termux/files/usr/bin/env ruby
 # -*- coding: binary -*-
 #
 # This user interface provides users with a command console interface to the
