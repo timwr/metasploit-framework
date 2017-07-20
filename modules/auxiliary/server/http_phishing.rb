@@ -41,10 +41,15 @@ class MetasploitModule < Msf::Auxiliary
     print_status("Request '#{request.uri}' from #{cli.peerhost}:#{cli.peerport}")
     uri = request.uri
     res = send_request_cgi({
+      'uri'      => uri,
       'method'   => request.method,
-      'uri'      => normalize_uri(uri),
+      'headers'  => request.headers,
     })
-    send_response(cli, res.body)
+
+    response = create_response(res.code)
+    response.body = res.body
+    response.headers = res.headers
+    cli.send_response(response)
   end
 
   def run
