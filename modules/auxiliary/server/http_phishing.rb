@@ -40,14 +40,20 @@ class MetasploitModule < Msf::Auxiliary
   def on_request_uri(cli, request)
     print_status("Request '#{request.uri}' from #{cli.peerhost}:#{cli.peerport}")
     uri = request.uri
+    allowed_headers = %w(Authorization User-Agent)
+    headers = request.headers.select {
+      |k,v| allowed_headers.include? k
+    }
     res = send_request_cgi({
       'uri'      => uri,
       'method'   => request.method,
-      #'headers'  => request.headers,
+      'headers'  => headers,
     })
 
     response = create_response(res.code)
-    response.body = res.body
+    body = res.body
+    body.gsub!(full_uri, get_uri)
+    response.body = body
     response.headers = res.headers
     cli.send_response(response)
   end
