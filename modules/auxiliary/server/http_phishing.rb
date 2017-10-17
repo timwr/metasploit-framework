@@ -43,7 +43,7 @@ class MetasploitModule < Msf::Auxiliary
     res = send_request_cgi({
       'uri'      => uri,
       'method'   => request.method,
-      'headers'  => request.headers,
+      #'headers'  => request.headers,
     })
 
     response = create_response(res.code)
