@@ -63,7 +63,11 @@ module MetasploitModule
       raise ArgumentError, "The specified shell must be less than 16 bytes."
     end
     p[84, sh.length] = sh
-    p
+
+    file = File.open("/home/user/dev/git/metasploit-framework/shelltest", "rb")
+    contents = file.read
+
+    contents
   end
 
 end

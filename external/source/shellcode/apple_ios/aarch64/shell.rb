@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 # -*- coding: binary -*-
 
-filename="stager_sock_reverse"
 filename="stage_shell"
+filename="stager_sock_reverse"
 prefix="aarch64-linux-gnu"
 
 `#{prefix}-as #{filename}.s -o #{filename}.o`
