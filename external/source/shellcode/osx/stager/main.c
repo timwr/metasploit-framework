@@ -15,7 +15,7 @@ uint64_t find_symbol(uint64_t base, char* symbol);
 uint64_t find_entry_offset(struct mach_header_64 *mh);
 int string_compare(const char* s1, const char* s2);
 
-/*#define DEBUG*/
+#define DEBUG
 #ifdef DEBUG
 static void print(char * str);
 #endif
@@ -27,10 +27,16 @@ int main(int argc, char** argv)
 #endif
 	uint64_t buffer = 0;
 	uint64_t buffer_size = 0;
+#ifdef __x86_64
 	__asm__(
 			"movq %%r10, %0;\n"
 			"movq %%r12, %1;\n"
 			: "=g"(buffer), "=g"(buffer_size));
+#else
+	if (!buffer) {
+		return 0;
+	}
+#endif
 
 #ifdef DEBUG
 	print("hello world!\n");
@@ -148,8 +154,9 @@ uint64_t find_symbol(uint64_t base, char* symbol)
 
 uint64_t syscall_chmod(uint64_t path, long mode) 
 {
-	uint64_t chmod_no = 0x200000f;
 	uint64_t ret = 0;
+#ifdef __x86_64
+	uint64_t chmod_no = 0x200000f;
 	__asm__(
 			"movq %1, %%rax;\n"
 			"movq %2, %%rdi;\n"
@@ -159,6 +166,18 @@ uint64_t syscall_chmod(uint64_t path, long mode)
 			: "=g"(ret)
 			: "g"(chmod_no), "S"(path), "g"(mode)
 			:);
+#else
+	uint64_t chmod_no = 0xf;
+	register uint64_t x0 asm("x16") = chmod_no;
+	register uint64_t x1 asm("x0") = path;
+	register uint64_t x2 asm("x1") = mode;
+	asm volatile(
+			"svc 0x80;\n"
+			: "=r"(ret)
+			: "r"(chmod_no), "r"(path), "r"(mode)
+			:);
+	ret = x0;
+#endif
 	return ret;
 }
 
@@ -218,12 +237,14 @@ int string_len(const char* s1)
 
 void print(char * str) 
 {
-	long write = 0x2000004;
 	long stdout = 1;
 	unsigned long len = string_len(str);
 	unsigned long long addr = (unsigned long long) str;
 	unsigned long ret = 0;
+
 	/* ret = write(stdout, str, len); */
+#ifdef __x86_64
+	long write = 0x2000004;
 	__asm__(
 			"movq %1, %%rax;\n"
 			"movq %2, %%rdi;\n"
@@ -234,5 +255,25 @@ void print(char * str)
 			: "=g"(ret)
 			: "g"(write), "g"(stdout), "S"(addr), "g"(len)
 			: "rax", "rdi", "rdx" );
+#else
+	uint64_t write = 0x04;
+	register uint64_t x16 asm("x16") = write;
+	register uint64_t x0 asm("x0") = stdout;
+	register uint64_t x1 asm("x1") = addr;
+	register uint64_t x2 asm("x2") = len;
+	register uint64_t xret asm("x0");
+	asm volatile(
+			"mov x0, %2;\n"
+			"mov x1, %3;\n"
+			"mov x2, %4;\n"
+			"mov x16, %1;\n"
+			"svc 0x80;\n"
+			"mov %0, x0;\n"
+			: "=r"(xret)
+			: "r"(x16), "r"(x0), "r"(addr), "r"(len)
+			:);
+	ret = xret;
+#endif
+
 }
 #endif

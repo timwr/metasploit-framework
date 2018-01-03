@@ -94,9 +94,9 @@ module MetasploitModule
 
       ; setup stack?
       and rsp, -0x10              ; Align
-      add sp, 0x40                 ; Add room for initial stack and prog name
+      add sp, 0x40                ; Add room for initial stack and prog name
       mov rax, 109                ; prog name "m"
-      push 0                    ;
+      push 0                      ;
       mov rcx, rsp                ; save the stack
       push 0
       push 0
