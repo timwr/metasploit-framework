@@ -32,10 +32,16 @@ int main(int argc, char** argv)
 			"movq %%r10, %0;\n"
 			"movq %%r12, %1;\n"
 			: "=g"(buffer), "=g"(buffer_size));
-#else
-	if (!buffer) {
+	if (buffer == -1) {
 		return 0;
 	}
+	if (buffer_size == -1) {
+		return 0;
+	}
+#else
+	/*if (!buffer) {*/
+		/*return 0;*/
+	/*}*/
 #endif
 
 #ifdef DEBUG
@@ -50,19 +56,35 @@ int main(int argc, char** argv)
 	if (!dyld) {
 		return 1;
 	}
+#ifdef DEBUG
+	print("got dyld!\n");
+#endif
 
+#ifdef __x86_64
 	NSCreateObjectFileImageFromMemory_ptr NSCreateObjectFileImageFromMemory_func = (void*)find_symbol(dyld, "_NSCreateObjectFileImageFromMemory");
 	if (!NSCreateObjectFileImageFromMemory_func) {
 		return 1;
 	} 
-#ifdef DEBUG
-	print("good symbol!\n");
-#endif
 
 	NSLinkModule_ptr NSLinkModule_func = (void*)find_symbol(dyld, "_NSLinkModule");
 	if (!NSLinkModule_func) {
 		return 1;
 	} 
+#else
+#ifdef DEBUG
+	print("good symbol!\n");
+#endif
+	NSCreateObjectFileImageFromMemory_ptr NSCreateObjectFileImageFromMemory_func = 0;
+	NSLinkModule_ptr NSLinkModule_func = 0;
+
+	typedef void* (*dlsym_ptr)(void *handle, const char *symbol);
+	dlsym_ptr dlsym_func = (void*)find_symbol(dyld, "_dlsym");
+#ifdef DEBUG
+	if (dlsym_func)
+	print("great symbol!\n");
+#endif
+	return 0;
+#endif
 
 	/*if (*(char*)buffer == 'b') {*/
 	/*print("magic b!\n");*/
@@ -132,7 +154,7 @@ uint64_t find_symbol(uint64_t base, char* symbol)
 		lc = (struct load_command *)((unsigned long)lc + lc->cmdsize);
 	}
 
-	if (!linkedit || !symtab || !text) return -1;
+	if (!linkedit || !symtab || !text) return 0;
 
 	unsigned long file_slide = linkedit->vmaddr - text->vmaddr - linkedit->fileoff;
 	strtab = (char *)(base + file_slide + symtab->stroff);
@@ -140,16 +162,16 @@ uint64_t find_symbol(uint64_t base, char* symbol)
 	nl = (struct nlist_64 *)(base + file_slide + symtab->symoff);
 	for (int i=0; i<symtab->nsyms; i++) {
 		char *name = strtab + nl[i].n_un.n_strx;
-		/*#ifdef DEBUG*/
-		/*print(name);*/
-		/*print("\n");*/
-		/*#endif*/
+		#ifdef DEBUG
+		print(name);
+		print("\n");
+		#endif
 		if (string_compare(name, symbol) == 0) {
 			return base + nl[i].n_value;
 		}
 	}
 
-	return -1;
+	return 0;
 }
 
 uint64_t syscall_chmod(uint64_t path, long mode) 
@@ -168,15 +190,15 @@ uint64_t syscall_chmod(uint64_t path, long mode)
 			:);
 #else
 	uint64_t chmod_no = 0xf;
-	register uint64_t x0 asm("x16") = chmod_no;
-	register uint64_t x1 asm("x0") = path;
-	register uint64_t x2 asm("x1") = mode;
 	asm volatile(
+			"mov x0, %2;\n"
+			"mov x1, %3;\n"
+			"mov x16, %1;\n"
 			"svc 0x80;\n"
+			"mov %0, x0;\n"
 			: "=r"(ret)
 			: "r"(chmod_no), "r"(path), "r"(mode)
-			:);
-	ret = x0;
+			: "x0", "x1", "x16");
 #endif
 	return ret;
 }
