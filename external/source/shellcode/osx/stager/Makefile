@@ -15,11 +15,16 @@ main_ios: main.c
 	$(GCC) -o $@ $^
 	ldid -S $@
 
+load_ios: load.c
+	$(GCC) -o $@ $^
+	ldid -Sent.xml $@
+
 main_osx: main.c
 	$(GCC_OSX) -o $@ $^
 
-install: main_osx
+install: main_osx main_ios
 	cp main_osx ../../../../../data/meterpreter/x64_osx_stage
+	cp main_ios ../../../../../data/meterpreter/aarch64_ios_stage
 
 shellcode: install
 	otool -tv main_osx

