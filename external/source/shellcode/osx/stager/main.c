@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <dlfcn.h>
+
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 #include <mach-o/dyld.h>
@@ -27,10 +29,17 @@ typedef struct nlist nlist_t;
 typedef NSObjectFileImageReturnCode (*NSCreateObjectFileImageFromMemory_ptr)(void *address, unsigned long size, NSObjectFileImage *objectFileImage);
 typedef NSModule (*NSLinkModule_ptr)(NSObjectFileImage objectFileImage, const char* moduleName, unsigned long options);
 typedef void (*_dyld_register_func_for_add_image_ptr)(void (*func)(struct mach_header* mh, unsigned long vmaddr_slide));
-typedef int (*printf_ptr)( const char * format, ...);
+typedef int (*fprintf_ptr)( FILE * stream, const char * format, ... );
+typedef void* (*dlsym_ptr)(void *handle, const char *symbol);
 
-uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int dereference);
+void* stderr_ptr = 0;
+fprintf_ptr fprintf_func = 0;
+dlsym_ptr dlsym_func = 0;
+
+/*uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int dereference);*/
+uint64_t find_magic(uint64_t addr, uint32_t magic, unsigned int increment, unsigned int pointer);
 uint64_t find_symbol(uint64_t base, char* symbol);
+uint64_t set_symbols(uint64_t base);
 uint64_t find_entry_offset(struct mach_header_64 *mh);
 int string_compare(const char* s1, const char* s2);
 
@@ -70,34 +79,49 @@ int main(int argc, char** argv)
 	print("hello world!\n");
 #endif
 
-	uint64_t binary = find_macho(0x100000000, 0x1000, 0);
+	uint64_t binary = find_magic(0x100000000, MH_MAGIC_64, 0x1000, 0);
 	if (!binary) {
 		return 1;
 	}
-	typedef void* (*dlsym_ptr)(void *handle, const char *symbol);
-	dlsym_ptr dlsym_func = (void*)find_symbol(binary, "_dlsymlol");
-	uint64_t dyld = find_macho(binary + 0x1000, 0x1000, 0);
+	uint64_t dyld = find_magic(binary + 0x1000, MH_MAGIC_64, 0x1000, 0);
 	if (!dyld) {
 		return 1;
 	}
-	dlsym_func = (void*)find_symbol(dyld, "_dlsymlol");
+
 #ifdef DEBUG
 	print("got dyld!\n");
-#endif
 
-	print("got dyld symbol!\n");
-	printf_ptr printf_func = (void*)find_symbol(dyld, "_fprintf");
-	/*printf_func("printf\n");*/
-	if (printf_func)
-			fprintf(stderr, "%s %p\n", "lol", printf_func);
+	stderr_ptr = (void*)find_symbol(dyld, "___stderrp");
+	fprintf_func = (void*)find_symbol(dyld, "_fprintf");
+	if (fprintf_func) {
+		fprintf_func(stderr_ptr, "%s %p\n", "fprintf_func", fprintf_func);
+		fprintf_func(stderr_ptr, "%s %p\n", "main", main);
+		fprintf_func(stderr_ptr, "%s %p\n", "fprintf", fprintf);
+		/*fprintf_func(stderr_ptr, "%s %p\n", "_fprintf", dlsym_func(RTLD_DEFAULT, "_fprintf"));*/
+	}
+	dlsym_func = (void*)find_symbol(dyld, "_dlsym");
+	fprintf_func(stderr_ptr, "%s %p\n", "dlsym", dlsym_func);
+	fprintf_func(stderr_ptr, "%s %p\n", "dlsym", dlsym_func(RTLD_DEFAULT, "dlsym"));
 
+	uint64_t my_macho = find_magic(0x100000000, 0xfeedfa63, 0x1000, 0);
+	if (!my_macho) {
+		return 1;
+	}
+	fprintf_func(stderr_ptr, "%s %p\n", "my_macho", my_macho);
+
+	/*set_symbols(my_macho);*/
+	/*set_symbols(my_macho);*/
+
+	fprintf_func(stderr_ptr, "%s %p\n", "fprintf", fprintf);
+	/*rebind_symbols_for_image(my_macho, 0);*/
 	_dyld_register_func_for_add_image_ptr _dyld_register_func_for_add_image_func = (void*)find_symbol(dyld, "__dyld_register_func_for_add_image");
 	if (_dyld_register_func_for_add_image_func) {
-		print("got dyld symbol!\n");
+		print("register add image!\n");
 		_dyld_register_func_for_add_image_func(rebind_symbols_for_image);
+		print("done add image!\n");
 	}
 
-	return 0;
+#endif
 #ifdef __x86_64
 	NSCreateObjectFileImageFromMemory_ptr NSCreateObjectFileImageFromMemory_func = (void*)find_symbol(dyld, "_NSCreateObjectFileImageFromMemory");
 	if (!NSCreateObjectFileImageFromMemory_func) {
@@ -147,7 +171,7 @@ int main(int argc, char** argv)
 #endif
 
 	uint64_t execute_base = (uint64_t)nm;
-	execute_base = find_macho(execute_base, sizeof(int), 1);
+	execute_base = find_magic(execute_base, MH_MAGIC_64, sizeof(int), 1);
 
 	uint64_t entry_off = find_entry_offset((void*)execute_base);
 	if (!entry_off) {
@@ -163,8 +187,10 @@ int main(int argc, char** argv)
 
 static void fix_bindings( section_t *section, intptr_t slide, nlist_t *symtab, char *strtab, uint32_t *indirect_symtab) 
 {
+	fprintf_func(stderr_ptr, "fix_bindings %p %p\n", section, indirect_symtab);
   uint32_t *indirect_symbol_indices = indirect_symtab + section->reserved1;
   void **indirect_symbol_bindings = (void **)((uintptr_t)slide + section->addr);
+	fprintf_func(stderr_ptr, "indirect_bindings %p %p\n", indirect_symbol_indices, indirect_symbol_bindings);
   for (uint i = 0; i < section->size / sizeof(void *); i++) {
     uint32_t symtab_index = indirect_symbol_indices[i];
     if (symtab_index == INDIRECT_SYMBOL_ABS || symtab_index == INDIRECT_SYMBOL_LOCAL ||
@@ -173,17 +199,20 @@ static void fix_bindings( section_t *section, intptr_t slide, nlist_t *symtab, c
     }
     uint32_t strtab_offset = symtab[symtab_index].n_un.n_strx;
     char *symbol_name = strtab + strtab_offset;
-		if (indirect_symbol_bindings[i] == fprintf) {
-			fprintf(stderr, "%s %p\n", symbol_name, indirect_symbol_bindings[i]);
+			/*print(symbol_name);*/
+			/*print("!!!!\n");*/
+		/*if (indirect_symbol_bindings[i] == fprintf) {*/
+			/*fprintf(stderr, "%s %p\n", symbol_name, indirect_symbol_bindings[i]);*/
 			/*print("!!!!\n");*/
 			/*print(symbol_name);*/
 			/*print("!!!!\n");*/
-		}
+		/*}*/
 	}
 }
 
 void parse_image(const mach_header_t *header, intptr_t slide) 
 {
+	fprintf_func(stderr_ptr, "parse_image %p %p\n", header, slide);
   /*Dl_info info;*/
   /*if (dladdr(header, &info) == 0) {*/
     /*return;*/
@@ -197,8 +226,9 @@ void parse_image(const mach_header_t *header, intptr_t slide)
   uintptr_t cur = (uintptr_t)header + sizeof(mach_header_t);
   for (uint i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
     cur_seg_cmd = (segment_command_t *)cur;
+		/*fprintf_func(stderr_ptr, "segmend %p %p %p\n", cur_seg_cmd, cur_seg_cmd->cmd, cur_seg_cmd->cmdsize);*/
     if (cur_seg_cmd->cmd == LC_SEGMENT_ARCH_DEPENDENT) {
-      if (strcmp(cur_seg_cmd->segname, SEG_LINKEDIT) == 0) {
+      if (string_compare(cur_seg_cmd->segname, SEG_LINKEDIT) == 0) {
         linkedit_segment = cur_seg_cmd;
       }
     } else if (cur_seg_cmd->cmd == LC_SYMTAB) {
@@ -206,6 +236,7 @@ void parse_image(const mach_header_t *header, intptr_t slide)
     } else if (cur_seg_cmd->cmd == LC_DYSYMTAB) {
       dysymtab_cmd = (struct dysymtab_command*)cur_seg_cmd;
     }
+		/*fprintf_func(stderr_ptr, "segmend %p %s\n", cur_seg_cmd, cur_seg_cmd->segname);*/
   }
 
   if (!symtab_cmd || !dysymtab_cmd || !linkedit_segment ||
@@ -222,8 +253,11 @@ void parse_image(const mach_header_t *header, intptr_t slide)
   nlist_t *symtab = (nlist_t *)(linkedit_base + symtab_cmd->symoff);
   char *strtab = (char *)(linkedit_base + symtab_cmd->stroff);
 
+	/*print(strtab);*/
+
   // Get indirect symbol table (array of uint32_t indices into symbol table)
   uint32_t *indirect_symtab = (uint32_t *)(linkedit_base + dysymtab_cmd->indirectsymoff);
+	fprintf_func(stderr_ptr, "syms %p %p %p\n", linkedit_base, linkedit_segment, indirect_symtab);
 
   cur = (uintptr_t)header + sizeof(mach_header_t);
   for (uint i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
@@ -232,19 +266,18 @@ void parse_image(const mach_header_t *header, intptr_t slide)
       if (string_compare(cur_seg_cmd->segname, SEG_DATA) != 0 &&
           string_compare(cur_seg_cmd->segname, SEG_DATA_CONST) != 0) {
         continue;
-      }
-
-			print(cur_seg_cmd->segname);
-      for (uint j = 0; j < cur_seg_cmd->nsects; j++) {
-        section_t *sect =
-          (section_t *)(cur + sizeof(segment_command_t)) + j;
+			}
+			fprintf_func(stderr_ptr, "rebind %p %s\n", cur_seg_cmd, cur_seg_cmd->segname);
+			for (uint j = 0; j < cur_seg_cmd->nsects; j++) {
+        section_t *sect = (section_t *)(cur + sizeof(segment_command_t)) + j;
         if ((sect->flags & SECTION_TYPE) == S_LAZY_SYMBOL_POINTERS) {
 					/*print("lolol");*/
-					fix_bindings(sect, slide, symtab, strtab, indirect_symtab);
+					/*fix_bindings(sect, slide, symtab, strtab, indirect_symtab);*/
         }
         if ((sect->flags & SECTION_TYPE) == S_NON_LAZY_SYMBOL_POINTERS) {
-					/*print("lolal");*/
+					fprintf_func(stderr_ptr, "section %p %s %s\n", sect, sect->segname, sect->sectname);
 					fix_bindings(sect, slide, symtab, strtab, indirect_symtab);
+					/*print("lolal");*/
           /*perform_rebinding_with_section(rebindings, sect, slide, symtab, strtab, indirect_symtab);*/
         }
       }
@@ -254,8 +287,97 @@ void parse_image(const mach_header_t *header, intptr_t slide)
 
 void rebind_symbols_for_image(const mach_header_t *header, intptr_t slide)
 {
-		print("rebind!!\n");
-		parse_image(header, slide);
+		fprintf_func(stderr_ptr, "rebind %p %p\n", header, slide);
+		/*parse_image(header, slide);*/
+}
+
+uint64_t set_symbols(uint64_t base) 
+{
+	struct segment_command_64 *sc, *linkedit, *text;
+	struct load_command *lc;
+	struct symtab_command *symtab;
+	struct dysymtab_command *dysymtab;
+	struct nlist_64 *nl;
+
+	char *strtab;
+	symtab = 0;
+	linkedit = 0;
+	text = 0;
+
+	lc = (struct load_command *)(base + sizeof(struct mach_header_64));
+	for (int i=0; i<((struct mach_header_64 *)base)->ncmds; i++) {
+		if (lc->cmd == LC_SYMTAB) {
+			symtab = (struct symtab_command *)lc;
+		} else if (lc->cmd == LC_SEGMENT_64) {
+			sc = (struct segment_command_64 *)lc;
+			char * segname = ((struct segment_command_64 *)lc)->segname;
+			if (string_compare(segname, "__LINKEDIT") == 0) {
+				linkedit = sc;
+			} else if (string_compare(segname, "__TEXT") == 0) {
+				text = sc;
+			}
+    } else if (lc->cmd == LC_DYSYMTAB) {
+      dysymtab = (struct dysymtab_command*)lc;
+    }
+		lc = (struct load_command *)((unsigned long)lc + lc->cmdsize);
+	}
+
+	if (!linkedit || !symtab || !text || !dysymtab) return 0;
+
+	uint32_t *indirect_symtab = (uint32_t *)((linkedit - linkedit->fileoff) + dysymtab->indirectsymoff);
+	fprintf_func(stderr_ptr, "symtab %p %p %p %p\n", text, linkedit, symtab, dysymtab);
+	/*fprintf_func(stderr_ptr, "symtab %p %p %p %p\n", (text - base), (linkedit - base), (symtab - base), (dysymtab - base));*/
+
+	unsigned long file_slide = linkedit->vmaddr - text->vmaddr - linkedit->fileoff;
+	fprintf_func(stderr_ptr, "file_slide %p %p %p %p\n", file_slide, linkedit->vmaddr, text->vmaddr, linkedit->fileoff);
+	strtab = (char *)(base + file_slide + symtab->stroff);
+	fprintf_func(stderr_ptr, "symtab %p %p %p %p\n", dysymtab, dysymtab->indirectsymoff, dysymtab->nindirectsyms, indirect_symtab);
+	/*fprintf_func(stderr_ptr, "symtab %p %p %p %p\n", dysymtab, dysymtab->indirectsymoff, dysymtab->nindirectsyms, *indirect_symtab);*/
+
+	nl = (struct nlist_64 *)(base + file_slide + symtab->symoff);
+	for (int i=0; i<symtab->nsyms; i++) {
+		char *name = strtab + nl[i].n_un.n_strx;
+		#ifdef DEBUG
+		fprintf_func(stderr_ptr, "symbol %p %p %s %p\n", i, (base + nl[i].n_value), name, nl[i].n_value);
+		#endif
+		/*symbol = base + */
+		if (nl[i].n_value == 0) {
+			void* symbol = dlsym_func(RTLD_DEFAULT, name + 1);
+			if (symbol) {
+				fprintf_func(stderr_ptr, "linking %s %p %p -> %p\n", name, symbol, nl[i].n_value, (symbol - base));
+				/*nl[i].n_value = symbol - base;*/
+			}
+		}
+
+		/*if (string_compare(name, symbol) == 0) {*/
+			/*return base + nl[i].n_value;*/
+		/*}*/
+	}
+
+	fprintf_func(stderr_ptr, "base %p %p %p\n", (void*)base + 0x3000, (base + 0x3000), *(uint64_t*)(base + 0x3000));
+	/*fprintf(stderr_ptr, "lol\n");*/
+
+	nl = (struct nlist_64 *)(base + file_slide + symtab->symoff);
+	for (int i=0; i<symtab->nsyms; i++) {
+		char *name = strtab + nl[i].n_un.n_strx;
+		#ifdef DEBUG
+		fprintf_func(stderr_ptr, "symbol %p %s %p\n", (base + nl[i].n_value), name, nl[i].n_value);
+		#endif
+		/*symbol = base + */
+		if (nl[i].n_value == 0) {
+			void* symbol = dlsym_func(RTLD_DEFAULT, name + 1);
+			if (symbol) {
+				fprintf_func(stderr_ptr, "linking %s %p %p -> %p\n", name, symbol, nl[i].n_value, (symbol - base));
+				nl[i].n_value = symbol - base;
+			}
+		}
+
+		/*if (string_compare(name, symbol) == 0) {*/
+			/*return base + nl[i].n_value;*/
+		/*}*/
+	}
+	fprintf(stderr_ptr, "lol\n");
+	return 0;
 }
 
 uint64_t find_symbol(uint64_t base, char* symbol) 
@@ -294,10 +416,13 @@ uint64_t find_symbol(uint64_t base, char* symbol)
 	nl = (struct nlist_64 *)(base + file_slide + symtab->symoff);
 	for (int i=0; i<symtab->nsyms; i++) {
 		char *name = strtab + nl[i].n_un.n_strx;
-		/*#ifdef DEBUG*/
+		#ifdef DEBUG
 		/*print(name);*/
 		/*print("\n");*/
-		/*#endif*/
+		/*if (fprintf_func && stderr_ptr)*/
+			/*fprintf_func(stderr_ptr, "symbol %p %s %p\n", (base + nl[i].n_value), name, nl[i].n_value);*/
+		#endif
+
 		if (string_compare(name, symbol) == 0) {
 			return base + nl[i].n_value;
 		}
@@ -335,7 +460,7 @@ uint64_t syscall_chmod(uint64_t path, long mode)
 	return ret;
 }
 
-uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer) 
+uint64_t find_magic(uint64_t addr, uint32_t magic, unsigned int increment, unsigned int pointer) 
 {
 	while(1) {
 		uint64_t ptr = addr;
@@ -343,7 +468,7 @@ uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer)
 			ptr = *(uint64_t *)ptr;
 		}
 		unsigned long ret = syscall_chmod(ptr, 0777);
-		if (ret == 0x2 && ((int *)ptr)[0] == MH_MAGIC_64) {
+		if (ret == 0x2 && ((int *)ptr)[0] == magic) {
 			return ptr;
 		}
 
