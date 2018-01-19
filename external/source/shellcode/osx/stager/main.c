@@ -286,18 +286,20 @@ int main(int argc, char** argv)
 	if (fprintf_func) {
 		fprintf_func(stderr_ptr, "%s %p\n", "fprintf_func", fprintf_func);
 		fprintf_func(stderr_ptr, "%s %p\n", "main", main);
-		fprintf_func(stderr_ptr, "%s %p\n", "fprintf", fprintf);
+		/*fprintf_func(stderr_ptr, "%s %p\n", "fprintf", fprintf);*/
+		fprintf_func(stderr_ptr, "%s %p %p\n", "fprintf", fprintf, &fprintf);
 		/*fprintf_func(stderr_ptr, "%s %p\n", "_fprintf", dlsym_func(RTLD_DEFAULT, "_fprintf"));*/
 	}
 	dlsym_func = (void*)find_symbol(dyld, "_dlsym");
+	fprintf_func(stderr_ptr, "%s %p\n", "dlsym", dlsym);
 	fprintf_func(stderr_ptr, "%s %p\n", "dlsym", dlsym_func);
 	fprintf_func(stderr_ptr, "%s %p\n", "dlsym", dlsym_func(RTLD_DEFAULT, "dlsym"));
 
 	/*set_symbols(my_macho);*/
 	/*set_symbols(my_macho);*/
 
-	lazy_load_dylib(fprintf);
-	print("main!\n");
+	/*lazy_load_dylib(fprintf);*/
+	/*print("main!\n");*/
 
 	fprintf_func(stderr_ptr, "%s %p\n", "fprintf", fprintf);
 	/*rebind_symbols_for_image(my_macho, 0);*/
@@ -309,7 +311,7 @@ int main(int argc, char** argv)
 	}
 
 	while (1) {
-		sleep(100);
+		/*sleep(100);*/
 	}
 
 	uint64_t my_macho = find_magic(0x100000000, 0xfeedfa63, 0x1000, 0);
