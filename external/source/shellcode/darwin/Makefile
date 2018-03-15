@@ -15,10 +15,7 @@ main_osx: main.c
 main_ios: main.c
 	$(GCC_IOS) -o $@ $^
 
-install: main_osx
-	cp main_osx ../../../../../data/meterpreter/x64_osx_stage
-
-shellcode: install
+shellcode: main_osx
 	otool -tv main_osx
 
 clean:

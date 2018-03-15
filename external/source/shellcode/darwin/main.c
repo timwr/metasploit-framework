@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
+#ifdef OSX
 typedef NSObjectFileImageReturnCode (*NSCreateObjectFileImageFromMemory_ptr)(void *address, unsigned long size, NSObjectFileImage *objectFileImage);
 typedef NSModule (*NSLinkModule_ptr)(NSObjectFileImage objectFileImage, const char* moduleName, unsigned long options);
 
@@ -26,7 +27,7 @@ uint64_t find_entry_offset(struct mach_header_64 *mh);
 int string_compare(const char* s1, const char* s2);
 int detect_sierra();
 
-/*#define DEBUG*/
+#define DEBUG
 #ifdef DEBUG
 static void print(char * str);
 #endif
@@ -297,5 +298,58 @@ void print(char * str)
       : "=g"(ret)
       : "g"(write), "g"(stdout), "S"(addr), "g"(len)
       : "rax", "rdi", "rdx" );
+}
+#endif
+#else
+
+long syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6);
+
+int main(int argc, char** argv)
+{
+  syscall(1, 0, 0, 0, 0, 0, 0);
+  return 0;
+}
+
+long syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6){
+  long ret;
+#ifdef __x86_64
+  asm volatile (
+      "movq %1, %%rax\n\t"
+      "movq %2, %%rdi\n\t"
+      "movq %3, %%rsi\n\t"
+      "movq %4, %%rdx\n\t"
+      "movq %5, %%rcx\n\t"
+      "movq %6, %%r8\n\t"
+      "movq %7, %%r9\n\t"
+      "syscall"
+      : "=a"(ret)
+      : "g"(syscall_number), "g"(arg1), "g"(arg2), "g"(arg3), "g"(arg4), "g"(arg5), "g"(arg6)    );
+#else
+  // : ¯\_(ツ)_/¯
+	volatile register uint64_t x16 asm("x16") = syscall_number;
+	volatile register uint64_t x0 asm("x0") = arg1;
+	volatile register uint64_t x1 asm("x1") = arg2;
+	volatile register uint64_t x2 asm("x2") = arg3;
+	volatile register uint64_t x3 asm("x3") = arg4;
+	volatile register uint64_t x4 asm("x4") = arg5;
+	volatile register uint64_t x5 asm("x5") = arg6;
+	volatile register uint64_t xret asm("x0");
+  asm volatile (
+      "mov x0, %2\n\t"
+      "mov x1, %3\n\t"
+      "mov x2, %4\n\t"
+      "mov x3, %5\n\t"
+      "mov x4, %6\n\t"
+      "mov x5, %7\n\t"
+      "mov x16, %1\n\t"
+      "svc 0x80\n\t"
+      "mov %0, x0\n\t"
+      : "=r"(xret)
+      /*: "r"(syscall_number), "r"(arg1), "r"(arg2), "r"(arg3), "r"(arg4), "r"(arg5), "r"(arg6)*/
+      : "r"(x16), "r"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(x4), "r"(x5)
+      : "x0", "x1", "x2", "x3", "x4", "x5", "x16");
+  ret = xret;
+#endif
+  return ret;
 }
 #endif
