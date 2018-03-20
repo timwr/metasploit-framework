@@ -18,6 +18,9 @@ main_ios: main.c
 shellcode: main_osx
 	otool -tv main_osx
 
+install: main_ios
+	cp main_ios ../../../../data/meterpreter/aarch64_iphone_darwin_stage
+
 clean:
 	rm -f *.o main_osx main_ios
 

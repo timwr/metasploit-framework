@@ -47,17 +47,10 @@ start:
     add    x2, x2, #1
     lsl    x2, x2, #12
 
-    /* mmap(addr=0, length='x2', prot=7, flags=0x1802 (MAP_ANON|MAP_PRIVATE|MAP_JIT), fd=0, offset=0) */
     adr    x0, next_stage
     lsr    x0, x0, #12
     add    x0, x0, #1
     lsl    x0, x0, #12
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
 
     /* Grab the saved size, save the address */
     ldr    w4, [sp]

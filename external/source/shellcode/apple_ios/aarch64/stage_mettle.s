@@ -1,5 +1,4 @@
 .equ SYS_READ, 0x3f
-.equ SYS_MMAP, 0xde
 .equ SYS_EXIT, 0x5d
 
 start:
@@ -7,20 +6,10 @@ start:
     ldr    w2, [x2]
     mov    x10, x2
 
-    /* Page-align, assume <4GB */
-    lsr    x2, x2, #12
-    add    x2, x2, #1
-    lsl    x2, x2, #12
-
-    /* mmap(addr=0, length='x2', prot=7, flags=34, fd=0, offset=0) */
-    mov    x0, xzr
-    mov    x1, x2
-    mov    x2, #7
-    mov    x3, #34
-    mov    x4, xzr
-    mov    x5, xzr
-    mov    x8, SYS_MMAP
-    svc    0
+    adr    x0, next_stage
+    lsr    x0, x0, #12
+    add    x0, x0, #1
+    lsl    x0, x0, #12
 
     /* Grab the saved size, save the address */
     mov    x4, x10
@@ -96,3 +85,5 @@ size:
 entry:
         .word 0
         .word 0
+
+next_stage:

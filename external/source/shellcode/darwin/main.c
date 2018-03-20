@@ -17,14 +17,17 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
+#define DYLD_BASE_ADDR 0x00007fff5fc00000
+uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer);
+uint64_t find_symbol(uint64_t base, char* symbol);
+int string_compare(const char* s1, const char* s2);
+
 #ifdef OSX
 typedef NSObjectFileImageReturnCode (*NSCreateObjectFileImageFromMemory_ptr)(void *address, unsigned long size, NSObjectFileImage *objectFileImage);
 typedef NSModule (*NSLinkModule_ptr)(NSObjectFileImage objectFileImage, const char* moduleName, unsigned long options);
 
-uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer);
-uint64_t find_symbol(uint64_t base, char* symbol);
 uint64_t find_entry_offset(struct mach_header_64 *mh);
-int string_compare(const char* s1, const char* s2);
+uint64_t find_entry_offset(struct mach_header_64 *mh);
 int detect_sierra();
 
 #define DEBUG
@@ -32,7 +35,6 @@ int detect_sierra();
 static void print(char * str);
 #endif
 
-#define DYLD_BASE_ADDR 0x00007fff5fc00000
 
 int main(int argc, char** argv)
 {
@@ -122,55 +124,7 @@ int main(int argc, char** argv)
   return main_func(new_argc, new_argv);
 }
 
-uint64_t find_symbol(uint64_t base, char* symbol) 
-{
-  struct segment_command_64 *sc, *linkedit, *text;
-  struct load_command *lc;
-  struct symtab_command *symtab;
-  struct nlist_64 *nl;
 
-  char *strtab;
-  symtab = 0;
-  linkedit = 0;
-  text = 0;
-
-  lc = (struct load_command *)(base + sizeof(struct mach_header_64));
-  for (int i=0; i<((struct mach_header_64 *)base)->ncmds; i++) {
-    if (lc->cmd == LC_SYMTAB) {
-      symtab = (struct symtab_command *)lc;
-    } else if (lc->cmd == LC_SEGMENT_64) {
-      sc = (struct segment_command_64 *)lc;
-      char * segname = ((struct segment_command_64 *)lc)->segname;
-      if (string_compare(segname, "__LINKEDIT") == 0) {
-        linkedit = sc;
-      } else if (string_compare(segname, "__TEXT") == 0) {
-        text = sc;
-      }
-    }
-    lc = (struct load_command *)((unsigned long)lc + lc->cmdsize);
-  }
-
-  if (!linkedit || !symtab || !text) {
-    return 0;
-  }
-
-  unsigned long file_slide = linkedit->vmaddr - text->vmaddr - linkedit->fileoff;
-  strtab = (char *)(base + file_slide + symtab->stroff);
-
-  nl = (struct nlist_64 *)(base + file_slide + symtab->symoff);
-  for (int i=0; i<symtab->nsyms; i++) {
-    char *name = strtab + nl[i].n_un.n_strx;
-    /*#ifdef DEBUG*/
-    /*print(name);*/
-    /*print("\n");*/
-    /*#endif*/
-    if (string_compare(name, symbol) == 0) {
-      return base + nl[i].n_value;
-    }
-  }
-
-  return 0;
-}
 
 uint64_t syscall_chmod(uint64_t path, long mode) 
 {
@@ -186,49 +140,6 @@ uint64_t syscall_chmod(uint64_t path, long mode)
       : "g"(chmod_no), "S"(path), "g"(mode)
       :);
   return ret;
-}
-
-uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer) 
-{
-  while(1) {
-    uint64_t ptr = addr;
-    if (pointer) {
-      ptr = *(uint64_t *)ptr;
-    }
-    unsigned long ret = syscall_chmod(ptr, 0777);
-    if (ret == 0x2 && ((int *)ptr)[0] == MH_MAGIC_64) {
-      return ptr;
-    }
-
-    addr += increment;
-  }
-  return 0;
-}
-
-uint64_t find_entry_offset(struct mach_header_64 *mh)
-{
-  struct entry_point_command *entry;
-  struct load_command *lc = (struct load_command *)((void*)mh + sizeof(struct mach_header_64));
-  for (int i=0; i<mh->ncmds; i++) {
-    if (lc->cmd == LC_MAIN) {
-      entry = (struct entry_point_command *)lc;
-      return entry->entryoff;
-    }
-
-    lc = (struct load_command *)((unsigned long)lc + lc->cmdsize);
-  }
-
-  return 0;
-}
-
-int string_compare(const char* s1, const char* s2) 
-{
-  while (*s1 != '\0' && *s1 == *s2)
-  {
-    s1++;
-    s2++;
-  }
-  return (*(unsigned char *) s1) - (*(unsigned char *) s2);
 }
 
 int detect_sierra()
@@ -302,12 +213,119 @@ void print(char * str)
 #endif
 #else
 
+struct dyld_cache_header
+{
+    char        magic[16];        // e.g. "dyld_v0     ppc"
+    uint32_t    mappingOffset;    // file offset to first shared_file_mapping
+    uint32_t    mappingCount;     // number of shared_file_mapping entries
+    uint32_t    imagesOffset;     // file offset to first dyld_cache_image_info
+    uint32_t    imagesCount;      // number of dyld_cache_image_info entries
+    uint64_t    dyldBaseAddress;  // base address of dyld when cache was built
+		uint64_t    codeSignatureOffset;
+		uint64_t    codeSignatureSize;
+		uint64_t    slideInfoOffset;
+		uint64_t    slideInfoSize;
+		uint64_t    localSymbolsOffset;
+		uint64_t    localSymbolsSize;
+		char        uuid[16];
+};
+
+struct shared_file_mapping {
+    uint64_t       address;
+    uint64_t       size;
+    uint64_t       file_offset;
+    uint32_t       max_prot;
+    uint32_t       init_prot;
+};
+
 long syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6);
+int main(int argc, char** argv);
+uint64_t syscall_chmod(uint64_t path, long mode);
+uint64_t syscall_shared_region_check_np();
+
+void init()
+{
+  main(0, 0);
+
+  /*uint64_t binary = DYLD_BASE_ADDR;*/
+  /*if (1) {*/
+    /*binary = find_macho(0x100000000, 0x1000, 0);*/
+    /*if (!binary) {*/
+      /*return;*/
+    /*}*/
+    /*binary += 0x1000;*/
+  /*}*/
+  /*uint64_t dyld = find_macho(binary, 0x1000, 0);*/
+  /*if (!dyld) {*/
+    /*return;*/
+  /*}*/
+
+  uint64_t shared_region_start = 0x180000000;
+  uint64_t binary = find_macho(shared_region_start + 0x1000, 0x1000, 0);
+  uint64_t dyld = find_macho(binary + 0x1000, 0x1000, 0);
+  uint64_t shared_region_check = syscall_shared_region_check_np();
+
+  /*struct dyld_cache_header *header = (void*)shared_region_start;*/
+  /*struct shared_file_mapping *sfm = (void*)header + header->mappingOffset;*/
+  /*void* vm_slide_offset  = (void*)header - sfm->address;*/
+  /*NSLog(@"vm_slide_offset %p\n",  vm_slide_offset);*/
+
+  /*struct dyld_cache_image_info *dcimg = (void*)header + header->imagesOffset;*/
+  /*void * libdyld_address;*/
+  /*for (size_t i=0; i < header->imagesCount; i++) {*/
+    /*char * pathFile = (char *)shared_region_start+dcimg->pathFileOffset;*/
+    /*if (strstr(pathFile, "libdyld.dylib") != -0) {*/
+      /*libdyld_address = (dcimg->address + vm_slide_offset);*/
+      /*break;*/
+    /*}*/
+    /*dcimg++;*/
+  /*}*/
+
+  typedef void* (*dlsym_ptr)(void *handle, const char *symbol);
+  typedef void (*dlopen_ptr)(const char *filename, int flags);
+  dlopen_ptr dlopen_func = 0;
+  dlsym_ptr dlsym_func = 0;
+  /*dlopen_func = (void*)dlsym_func((void*)0, "_dlsym");*/
+
+  typedef void (*func_ptr)();
+  func_ptr func = (func_ptr)0x4545454545;
+#ifdef __x86_64
+#else
+	volatile register uint64_t x0 asm("x0") = 0x45454541;
+	volatile register uint64_t x1 asm("x1") = (uint64_t)shared_region_start;
+	volatile register uint64_t x2 asm("x2") = (uint64_t)binary;
+	volatile register uint64_t x3 asm("x3") = (uint64_t)dyld;
+	volatile register uint64_t x4 asm("x4") = (uint64_t)shared_region_check;
+  asm volatile (
+      "mov x0, %0\n\t"
+      "mov x1, %1\n\t"
+      "mov x2, %2\n\t"
+      "mov x3, %3\n\t"
+      "mov x4, %4\n\t"
+      :
+      : "r"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(x4)
+      : "x0", "x1", "x2", "x3", "x4");
+#endif
+  func();
+}
 
 int main(int argc, char** argv)
 {
-  syscall(1, 0, 0, 0, 0, 0, 0);
+  /*syscall(4, 1, (long)"xk\n", 4, 0, 0, 0);*/
+  /*syscall(4, 0, (long)"xk\n", 4, 0, 0, 0);*/
   return 0;
+}
+
+uint64_t syscall_chmod(uint64_t path, long mode)
+{
+  return syscall(15, path, mode, 0, 0, 0, 0);
+}
+
+uint64_t syscall_shared_region_check_np()
+{
+  uint64_t address = 0;
+  syscall(294, &address, 0, 0, 0, 0, 0);
+  return address;
 }
 
 long syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6){
@@ -353,3 +371,101 @@ long syscall(const long syscall_number, const long arg1, const long arg2, const 
   return ret;
 }
 #endif
+
+uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer) 
+{
+  while(1) {
+    uint64_t ptr = addr;
+    if (pointer) {
+      ptr = *(uint64_t *)ptr;
+    }
+    unsigned long ret = syscall_chmod(ptr, 0777);
+    if (ret == 0x2 && ((int *)ptr)[0] == MH_MAGIC_64) {
+      return ptr;
+    }
+
+    addr += increment;
+  }
+  return 0;
+}
+
+uint64_t find_entry_offset(struct mach_header_64 *mh)
+{
+  struct entry_point_command *entry;
+  struct load_command *lc = (struct load_command *)((void*)mh + sizeof(struct mach_header_64));
+  for (int i=0; i<mh->ncmds; i++) {
+    if (lc->cmd == LC_MAIN) {
+      entry = (struct entry_point_command *)lc;
+      return entry->entryoff;
+    }
+
+    lc = (struct load_command *)((unsigned long)lc + lc->cmdsize);
+  }
+
+  return 0;
+}
+
+int string_compare(const char* s1, const char* s2) 
+{
+  while (*s1 != '\0' && *s1 == *s2)
+  {
+    s1++;
+    s2++;
+  }
+  return (*(unsigned char *) s1) - (*(unsigned char *) s2);
+}
+
+uint64_t find_symbol(uint64_t base, char* symbol) 
+{
+  struct segment_command_64 *sc, *linkedit, *text;
+  struct load_command *lc;
+  struct symtab_command *symtab;
+  struct nlist_64 *nl;
+
+  char *strtab;
+  symtab = 0;
+  linkedit = 0;
+  text = 0;
+
+  lc = (struct load_command *)(base + sizeof(struct mach_header_64));
+  for (int i=0; i<((struct mach_header_64 *)base)->ncmds; i++) {
+    if (lc->cmd == LC_SYMTAB) {
+      symtab = (struct symtab_command *)lc;
+    } else if (lc->cmd == LC_SEGMENT_64) {
+      sc = (struct segment_command_64 *)lc;
+      char * segname = ((struct segment_command_64 *)lc)->segname;
+      if (string_compare(segname, "__LINKEDIT") == 0) {
+        linkedit = sc;
+      } else if (string_compare(segname, "__TEXT") == 0) {
+        text = sc;
+      }
+    }
+    lc = (struct load_command *)((unsigned long)lc + lc->cmdsize);
+  }
+
+  if (!linkedit || !symtab || !text) {
+    return 0;
+  }
+
+  unsigned long file_slide = linkedit->vmaddr - text->vmaddr - linkedit->fileoff;
+  strtab = (char *)(base + file_slide + symtab->stroff);
+
+  nl = (struct nlist_64 *)(base + file_slide + symtab->symoff);
+  for (int i=0; i<symtab->nsyms; i++) {
+
+    char *name = strtab + nl[i].n_un.n_strx;
+    /*#ifdef DEBUG*/
+    /*print(name);*/
+    /*print("\n");*/
+    /*#endif*/
+    if (string_compare(name, symbol) == 0) {
+      if (!nl[i].n_value) {
+        continue;
+      }
+      return base + nl[i].n_value;
+    }
+  }
+  
+  return 0;
+}
+
