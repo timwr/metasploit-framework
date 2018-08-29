@@ -91,6 +91,7 @@ void init();
 
 int main(int argc, char** argv)
 {
+  /*crash();*/
   init();
   return 0;
 }
@@ -165,7 +166,7 @@ void init()
   }
 
   // TODO load meterpreter macho
-  crash();
+  /*crash();*/
 
   FILE *f = fopen("log_vm32", "rb");
   fseek(f, 0, SEEK_END);
@@ -218,22 +219,35 @@ void init()
   printf("yay libdyld_start? %p = %p\n", libdyld_start, *(int*)(libdyld_start));
   fflush(stdout);
 
-  int slide = 0;
-
-/*0x2872*/
-  /*typedef void (*dyld_start_ptr)(struct macho_header* asl, int argc, char const **argv, char const **envp);*/
-  /*char *main_argv[] = { "xk", NULL };*/
-  /*char *jit_region = (void*)init + 0x10000;*/
-  /*memcpy(jit_region, macho_file, sizeof(macho_file));*/
   /*dyld_start_ptr dyld_start_func = libdyld_address + 0x2874;*/
+  /*typedef void (*dyld_start_ptr)(struct macho_header* asl, int argc, char const **argv, char const **envp, );*/
+  /*dyld_start_func((struct macho_header*)0x41, 1, &main_argv, &slide);*/
+
+  /*unsigned int start_glue = 0;*/
+  /*int slide = 0;*/
+  /*unsigned int* startGlue = &start_glue;*/
+  /*typedef uintptr_t (*dyld_start_ptr)(const struct macho_header* appsMachHeader, int argc, const char* argv[], */
+				/*intptr_t slide, const struct macho_header* dyldsMachHeader,*/
+				/*uintptr_t* startGlue);*/
+  /*char *main_argv[] = { "xk", NULL };*/
   /*dyld_start_ptr dyld_start_func = dyld_start;*/
-  /*dyld_start_func((struct macho_header*)0, 1, &main_argv, &slide);*/
+  /*dyld_start_func((const struct macho_header*)jit_region, 1, &main_argv, &slide, (const struct macho_header*)dyld, &startGlue);*/
+
+
+  unsigned int start_glue = 0;
+  int slide = 0;
+  unsigned int* startGlue = &start_glue;
+  typedef uintptr_t (*dyld_start_ptr)(const struct macho_header* appsMachHeader, int argc, const char* argv[],
+				intptr_t slide, const struct macho_header* dyldsMachHeader,
+				uintptr_t* startGlue);
+  char *main_argv[] = { "xk", NULL };
+  dyld_start_ptr dyld_start_func = dyld_start;
+  dyld_start_func((const struct macho_header*)0, 0, 0, 0, (const struct macho_header*)0, 0);
 
   printf("finished\n");
   fflush(stdout);
 
-  //crash and check the stackframe
-  /*crash();*/
+  crash();
 }
 
 
