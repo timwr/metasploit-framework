@@ -166,7 +166,7 @@ void init()
   }
 
   // TODO load meterpreter macho
-  /*crash();*/
+  crash();
 
   FILE *f = fopen("log_vm32", "rb");
   fseek(f, 0, SEEK_END);
