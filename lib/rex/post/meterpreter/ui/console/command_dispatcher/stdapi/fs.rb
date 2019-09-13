@@ -181,13 +181,16 @@ class Console::CommandDispatcher::Stdapi::Fs
 
     print_line("Found #{files.length} result#{ files.length > 1 ? 's' : '' }...")
     files.each do | file |
-      if file['size'] > 0
-        print("    #{file['path']}#{ file['path'].empty? ? '' : client.fs.file.separator }#{file['name']} (#{file['size']} bytes)\n")
-      else
-        print("    #{file['path']}#{ file['path'].empty? ? '' : client.fs.file.separator }#{file['name']}\n")
+      path = file['path']
+      if !path.empty? && path != client.fs.file.separator
+        path += client.fs.file.separator
       end
+      path += file['name']
+      if file['size'] > 0
+        path += " (#{file['size']} bytes)"
+      end
+      print("    #{path}\n")
     end
-
   end
 
   #
