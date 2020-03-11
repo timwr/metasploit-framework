@@ -23,6 +23,9 @@ module MetasploitModule
       'Handler'     => Msf::Handler::ReverseTcp,
       'Convention'  => 'sockedi',
     ))
+    register_options([
+      OptInt.new('MeterpreterDebugLevel', [ true, "Set debug level for meterpreter 0-3 (Default output is strerr)", 0])
+    ])
   end
 
   def generate(opts = {})
