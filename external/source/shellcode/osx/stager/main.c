@@ -66,12 +66,9 @@ int main(int argc, char** argv)
   }
 
   NSCreateObjectFileImageFromMemory_ptr NSCreateObjectFileImageFromMemory_func = (void*)find_symbol(dyld, "_NSCreateObjectFileImageFromMemory");
-  if (!NSCreateObjectFileImageFromMemory_func) {
+  while (!NSCreateObjectFileImageFromMemory_func) {
     dyld = find_macho(dyld + 0x1000, 0x1000);
     NSCreateObjectFileImageFromMemory_func = (void*)find_symbol(dyld, "_NSCreateObjectFileImageFromMemory");
-    if (!NSCreateObjectFileImageFromMemory_func) {
-      return 1;
-    }
   } 
 #ifdef DEBUG
   print("good symbol!\n");
