@@ -108,6 +108,7 @@ class Message
     COMMAND = "AUTH"
     TYPE_TOKEN = 1
     TYPE_SIGNATURE = 2
+    TYPE_RSAPUBLICKEY = 3
 
     def initialize(type, data)
       super(type, 0, data)
