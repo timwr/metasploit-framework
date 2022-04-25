@@ -63,10 +63,10 @@ module Msf::Post::Windows::FileInfo
         return nil
       end
 
-      major = hiword(vs_fixed_file_info[2])
-      minor = loword(vs_fixed_file_info[2])
-      build = hiword(vs_fixed_file_info[3])
-      revision = loword(vs_fixed_file_info[3])
+      major = hiword(vs_fixed_file_info[4])
+      minor = loword(vs_fixed_file_info[4])
+      build = hiword(vs_fixed_file_info[5])
+      revision = loword(vs_fixed_file_info[5])
       branch = revision.to_s[0..1].to_i
     elsif session.type == 'powershell'
       result = cmd_exec("([System.Diagnostics.FileVersionInfo]::GetVersionInfo(\"#{filepath}\") | Select-Object FileMajorPart,FileMinorPart,FileBuildPart,FilePrivatePart) -join ''")
